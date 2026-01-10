@@ -4,88 +4,70 @@
 这是一个设计用于高并发健身评分和数据收集的 **模块化单体 (Modular Monolith)** Spring Boot 应用程序。
 
 **模块:**
-*   `fitness-common`: 核心工具类。
-*   `fitness-user`: 认证与入职流程。
+*   `fitness-common`: 核心工具类与拦截器。
+*   `fitness-user`: 用户认证、微信登录及首次设置流程 (Onboarding)。
 *   `fitness-content`: 动作内容管理系统 (CMS)。
-*   `fitness-ai`: AI 评分与事件流处理。
-*   `fitness-data`: 分析与数据仓库摄取。
+*   `fitness-ai`: AI 动作评分逻辑与 Kafka 事件流集成。
+*   `fitness-data`: 异步数据收集与分析。
 
 ## 2. 部署指南
 
 ### 先决条件
-*   JDK 17+ (项目已降级为 Java 17)
+*   JDK 17
 *   Maven 3.8+
-*   Docker & Kubernetes (可选)
+*   Docker & Docker Compose
 
-### 本地开发
+### 基础设施启动 (Docker)
+在运行应用程序之前，请启动必要的中间件：
 ```bash
-# 构建
-./mvnw clean install
-
-# 运行 (主入口点通常在 fitness-user 逻辑中，或使用专用运行器)
-# 理想情况下运行生成的 jar 包
-java -jar fitness-user/target/fitness-user-0.0.1-SNAPSHOT.jar
+docker-compose up -d mysql redis kafka zookeeper
 ```
+> [!NOTE]
+> 默认 Kafka 配置已调整，本地开发请连接 `localhost:29092`。
 
-### Docker 构建
-在根目录创建 `Dockerfile`:
-```dockerfile
-FROM eclipse-temurin:17-jre-alpine
-COPY fitness-user/target/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "/app.jar"]
-```
+### 本地开发运行
+1. **构建并安装模块**:
+   由于是多模块项目，必须先在根目录运行安装：
+   ```bash
+   mvn clean install -DskipTests
+   ```
 
-### Kubernetes (K8s) 部署
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: fitness-backend
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: fitness-backend
-  template:
-    metadata:
-      labels:
-        app: fitness-backend
-    spec:
-      containers:
-      - name: fitness-backend
-        image: your-registry/fitness-backend:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "prod"
-```
+2. **启动应用 (以 fitness-user 为入口)**:
+   使用 Maven 启动，并覆盖必要的连接参数以适配本地环境：
+   ```bash
+   mvn spring-boot:run -pl fitness-user -Dspring-boot.run.arguments=" \
+     --spring.datasource.url=jdbc:mysql://localhost:3306/fitness_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true \
+     --spring.data.redis.host=localhost \
+     --spring.kafka.bootstrap-servers=localhost:29092"
+   ```
 
-## 3. 运维指南
+## 3. 技术规范与实践
 
-### 日志
-*   默认输出到 STDOUT (生产环境建议使用 JSON 格式)。
-*   建议集成 **阿里云 SLS** 或 **ELK Stack**。
+### 消息队列 (Kafka)
+*   **序列化**: 项目使用 `JsonSerializer`。确保所有通过 `KafkaTemplate` 发送的 DTO 都具备无参构造函数。
+*   **配置**: 消费端需配置 `spring.json.trusted.packages: "*"` 以支持跨模块的数据包。
 
-### 监控
-*   暴露 Actuator 端点 (`/actuator/prometheus`) 用于 Prometheus 抓取。
-*   关键指标: `http_server_requests_seconds`, `jvm_memory_used_bytes`。
+### 数据库管理
+*   **Redis**: 使用 `spring.data.redis` 属性命名规范取代已弃用的 `spring.redis`。
+*   **MySQL**: 初始表结构位于 `sql/init.sql`。
 
-### 故障排除
-*   **AI 评分缓慢:** 检查 `frontend_event_stream` 主题的 Kafka 积压情况。
-*   **OOM (内存溢出):** 增加堆大小或检查 `DataCollectionConsumer` 是否存在内存泄漏。
+## 4. 故障排除
 
-## 4. API 参考
+*   **Kafka 序列化异常**: 
+    - 现象：`Can't convert value of class ... to class ... StringSerializer`
+    - 解决：在 `application.yml` 中明确指定 `value-serializer: org.springframework.kafka.support.serializer.JsonSerializer`。
+*   **数据库连接失败**: 
+    - 检查 Docker 容器状态：`docker ps`。
+    - 验证 `SPRING_DATASOURCE_URL` 中的主机名在容器内外是否正确（本地开发用 `localhost`，容器内用 `mysql`）。
+*   **Kafka 端口冲突**:
+    - 本地主机应通过 `29092` 端口访问，容器内部通信使用 `9092`。
 
-### 认证 (Auth)
-*   `POST /api/auth`: 登录 (手机/微信)。
-    *   Payload: `{ "type": "login_phone", "payload": { "phone": "..." } }`
-*   `POST /api/auth/onboarding`: 设置难度。
+## 5. API 参考
 
-### 动作库 (Library)
-*   `GET /api/library?difficulty=novice`: 列出动作。
-
-### AI 与 数据 (AI & Data)
-*   `POST /api/ai/score`: 同步评分。
-*   `POST /api/data/collect`: 异步批量数据收集。
-    *   Payload: `{ "sessionId": "...", "items": [...] }`
+| 功能         | 方法   | 路径                   | 关键 Payload                                               |
+| :----------- | :----- | :--------------------- | :--------------------------------------------------------- |
+| 手机登录     | `POST` | `/api/auth`            | `{ "type": "login_phone", "payload": { "phone": "..." } }` |
+| 入职设置     | `POST` | `/api/auth/onboarding` | `{"userId": "1", "difficultyLevel": "expert"}`             |
+| 获取动作库   | `GET`  | `/api/library`         | `?difficultyLevel=novice`                                  |
+| AI 评分      | `POST` | `/api/ai/score`        | `{"moveId": "m_squat", "data": { ... } }`                  |
+| 批量数据收集 | `POST` | `/api/data/collect`    | `{"sessionId": "...", "items": [...]}`                     |
