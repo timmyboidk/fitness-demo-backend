@@ -11,7 +11,6 @@ public class DataCollectionConsumer {
     @KafkaListener(topics = "frontend_event_stream", groupId = "fitness-data-group")
     public void consume(Object message) {
         log.info("Consumed event from Kafka: {}", message);
-        // In a real scenario, this would involve data cleaning and Doris ingestion.
-        log.info("Simulating Doris ingestion for event...");
+        log.info("Simulating Doris ingestion for event... [Doris: dwd_action_score]");
     }
 }

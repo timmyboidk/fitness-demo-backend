@@ -28,15 +28,15 @@ public class LibraryControllerTest {
 
     @Test
     public void testGetLibrary() throws Exception {
-        Map<String, Object> mockData = new HashMap<>();
-        mockData.put("items", "mock_items");
+        com.example.fitness.api.dto.LibraryResponse mockResponse = new com.example.fitness.api.dto.LibraryResponse();
+        mockResponse.setMoves(java.util.Collections.emptyList());
 
-        Mockito.when(libraryService.getLibraryByDifficulty(anyString())).thenReturn(mockData);
+        Mockito.when(libraryService.getLibrary(anyString())).thenReturn(mockResponse);
 
         mockMvc.perform(get("/api/library")
                 .param("difficulty", "novice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.items").value("mock_items"));
+                .andExpect(jsonPath("$.data.moves").isArray());
     }
 }

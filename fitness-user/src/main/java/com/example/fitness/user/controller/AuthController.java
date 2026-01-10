@@ -29,4 +29,10 @@ public class AuthController {
     public Result<Map<String, Object>> onboarding(@RequestBody Map<String, Object> request) {
         return Result.success(userService.onboarding(request));
     }
+
+    @PostMapping("/user/stats")
+    public Result<Void> updateStats(@RequestBody Map<String, Object> request) {
+        userService.updateUserStats(request);
+        return Result.success(null);
+    }
 }

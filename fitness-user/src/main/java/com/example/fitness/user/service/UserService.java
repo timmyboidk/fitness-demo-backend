@@ -9,4 +9,6 @@ public interface UserService {
     UserDTO loginByWechat(Map<String, Object> payload);
 
     Map<String, Object> onboarding(Map<String, Object> request);
+
+    void updateUserStats(Map<String, Object> request);
 }

@@ -15,7 +15,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration"
+        "spring.kafka.bootstrap-servers=localhost:9092",
+        "spring.data.redis.host=localhost",
+        "spring.data.redis.port=6379"
 })
 @AutoConfigureMockMvc
 public class CoreIntegrationTest {
@@ -25,12 +27,6 @@ public class CoreIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
-
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
 
     @Test
     public void testLibraryFlow() throws Exception {
