@@ -29,7 +29,7 @@ public class DataCollectionController {
      * 
      * @param request 包含会话ID和事件列表数据
      */
-    private final org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory circuitBreakerFactory;
+    private final org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory<?, ?> circuitBreakerFactory;
 
     /**
      * 批量数据收集接口

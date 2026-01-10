@@ -34,6 +34,11 @@ public @interface RateLimit {
 
     enum LimitType {
         /**
+         * 默认策略（全局/方法级）
+         */
+        DEFAULT,
+
+        /**
          * 自定义key
          */
         CUSTOMER,

@@ -1,6 +1,5 @@
 package com.example.fitness.user.controller;
 
-import com.example.fitness.api.dto.AuthRequest;
 import com.example.fitness.api.dto.UserDTO;
 import com.example.fitness.common.result.Result;
 import com.example.fitness.user.service.UserService;
@@ -25,11 +24,11 @@ public class AuthController {
      * @return 返回用户DTO信息
      */
     @PostMapping
-    public Result<UserDTO> login(@RequestBody AuthRequest request) {
+    public Result<UserDTO> login(@RequestBody com.example.fitness.api.dto.LoginRequest request) {
         if ("login_phone".equals(request.getType())) {
-            return Result.success(userService.loginByPhone(request.getPayload()));
+            return Result.success(userService.loginByPhone(request));
         } else if ("login_wechat".equals(request.getType())) {
-            return Result.success(userService.loginByWechat(request.getPayload()));
+            return Result.success(userService.loginByWechat(request));
         }
         return Result.error("不支持的登录类型");
     }

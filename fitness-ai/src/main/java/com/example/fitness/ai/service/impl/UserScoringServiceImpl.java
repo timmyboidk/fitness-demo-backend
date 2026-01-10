@@ -24,6 +24,7 @@ public class UserScoringServiceImpl implements ScoringService {
      * 计算评分逻辑：目前为 Mock 实现，并同步发送至 Kafka
      */
     @Override
+    @SuppressWarnings("null")
     public ScoringResponse calculateScore(ScoringRequest request) {
         if (request.getMoveId() == null || request.getMoveId().isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
@@ -40,7 +41,8 @@ public class UserScoringServiceImpl implements ScoringService {
 
         // 异步发送到 Kafka 供数据收集或后续处理（如 Doris 摄取）
         try {
-            kafkaTemplate.send(TOPIC, request.getMoveId(), request);
+            String moveId = request.getMoveId() != null ? request.getMoveId() : "unknown";
+            kafkaTemplate.send(TOPIC, moveId, request);
             log.info("已将评分事件发送至 Kafka, 动作 ID: {}", request.getMoveId());
         } catch (Exception e) {
             log.error("发送 Kafka 失败: {}", e.getMessage());

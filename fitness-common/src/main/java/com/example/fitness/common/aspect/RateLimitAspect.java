@@ -2,7 +2,7 @@ package com.example.fitness.common.aspect;
 
 import com.example.fitness.common.annotation.RateLimit;
 import com.example.fitness.common.exception.BusinessException;
-import com.example.fitness.common.exception.ErrorCode;
+import com.example.fitness.common.result.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -33,8 +33,8 @@ public class RateLimitAspect {
     private final StringRedisTemplate redisTemplate;
 
     @Before("@annotation(rateLimit)")
+    @SuppressWarnings("null")
     public void doBefore(JoinPoint point, RateLimit rateLimit) {
-        String key = rateLimit.key();
         int time = rateLimit.time();
         int count = rateLimit.count();
 
@@ -57,7 +57,7 @@ public class RateLimitAspect {
         Long number = redisTemplate.execute(redisScript, keys, String.valueOf(time), String.valueOf(count));
 
         if (number != null && number == 0) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR.getCode(), "访问过于频繁，请稍候再试");
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), "访问过于频繁，请稍候再试");
         }
     }
 

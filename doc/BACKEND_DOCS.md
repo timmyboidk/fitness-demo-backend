@@ -71,3 +71,19 @@ docker-compose up -d mysql redis kafka zookeeper
 | 获取动作库   | `GET`  | `/api/library`         | `?difficultyLevel=novice`                                  |
 | AI 评分      | `POST` | `/api/ai/score`        | `{"moveId": "m_squat", "data": { ... } }`                  |
 | 批量数据收集 | `POST` | `/api/data/collect`    | `{"sessionId": "...", "items": [...]}`                     |
+
+## 6. 可观测性 (Observability)
+
+### API 文档 (Swagger/OpenAPI)
+*   **地址**: `http://localhost:8080/swagger-ui.html`
+*   **用途**: 在线调试接口，查看参数定义。
+
+### 监控指标 (Actuator)
+*   **健康检查**: `/actuator/health`
+*   **应用信息**: `/actuator/info`
+*   **指标数据**: `/actuator/metrics`
+
+## 7. 未来路线图 (Roadmap)
+*   **数据库迁移**: 集成 Flyway 管理数据库版本变更。
+*   **链路追踪**: 引入 Micrometer Tracing + Zipkin 实现全链路监控。
+*   **容器化**: 提供 K8s 部署清单 (Helm Charts)。

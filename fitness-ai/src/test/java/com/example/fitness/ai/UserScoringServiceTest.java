@@ -11,13 +11,12 @@ import org.springframework.kafka.core.KafkaTemplate;
 import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 public class UserScoringServiceTest {
 
     @Test
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "null" })
     public void testCalculateScore() {
         KafkaTemplate<String, Object> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
         Mockito.when(kafkaTemplate.send(any(String.class), any(), any()))

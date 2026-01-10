@@ -13,6 +13,11 @@ wx:
 spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
   application:
     name: fitness-user
   main:
@@ -33,17 +38,18 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       # High Throughput Optimization (10k QPS)
       batch-size: 65536 # 64KB batch size
-      linger-ms: 10 # Wait 10ms to group batches
       buffer-memory: 67108864 # 64MB buffer
       acks: 1 # Leader only for low latency
       retries: 3
+      properties:
+        "[linger.ms]": 10
     consumer:
       group-id: fitness-data-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        "[spring.json.trusted.packages]": "*"
+        '[spring.json.trusted.packages]': "*"
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
