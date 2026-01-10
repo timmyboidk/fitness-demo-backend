@@ -10,17 +10,33 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * AI 评分控制器 - 提供动作评分接口及模型版本管理
+ */
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class ScoringController {
     private final ScoringService scoringService;
 
+    /**
+     * 动作评分接口
+     * 
+     * @param request 包含动作ID和关键点数据
+     * @return 返回评分结果（分数值及建议）
+     */
     @PostMapping("/ai/score")
     public Result<ScoringResponse> score(@RequestBody ScoringRequest request) {
         return Result.success(scoringService.calculateScore(request));
     }
 
+    /**
+     * 获取最新 AI 模型版本
+     * 
+     * @param platform       平台（iOS/Android）
+     * @param currentVersion 当前版本
+     * @return 返回更新信息及下载地址
+     */
     @GetMapping("/core/models/latest")
     public Result<Map<String, Object>> getLatestModel(@RequestParam String platform,
             @RequestParam String currentVersion) {

@@ -1,6 +1,5 @@
 package com.example.fitness.content;
 
-import com.example.fitness.content.mapper.MoveMapper;
 import com.example.fitness.content.mapper.UserLibraryMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

@@ -7,17 +7,20 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 用户实体类 - 对应数据库 user 表
+ */
 @Data
 @TableName("user")
 public class User {
     @TableId(type = IdType.AUTO)
-    private Long id;
-    private String phone;
-    private String nickname;
-    private String password;
-    private String openId;
-    private String sessionKey;
-    private String difficultyLevel;
+    private Long id; // 用户 ID
+    private String phone; // 手机号
+    private String nickname; // 昵称
+    private String password; // 密码
+    private String openId; // 微信 OpenID
+    private String sessionKey; // 微信会话密钥
+    private String difficultyLevel; // 运动难度等级
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

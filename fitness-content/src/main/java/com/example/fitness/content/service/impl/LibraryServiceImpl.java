@@ -8,6 +8,8 @@ import com.example.fitness.content.mapper.UserLibraryMapper;
 import com.example.fitness.content.model.entity.Move;
 import com.example.fitness.content.model.entity.UserLibrary;
 import com.example.fitness.content.service.LibraryService;
+import com.example.fitness.common.exception.BusinessException;
+import com.example.fitness.common.result.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,18 +26,21 @@ public class LibraryServiceImpl implements LibraryService {
     private final MoveMapper moveMapper;
     private final UserLibraryMapper userLibraryMapper;
 
+    /**
+     * 根据难度等级获取动作库
+     */
     @Override
     public LibraryResponse getLibrary(String difficulty) {
-        // Query DB
+        // 从数据库查询
         List<Move> moves = moveMapper.selectList(new LambdaQueryWrapper<Move>()
                 .eq(Move::getDifficulty, difficulty));
 
-        // Map Entity to DTO
+        // 将实体类转换为 DTO
         List<MoveDTO> moveDTOs = moves.stream().map(this::convertToDTO).collect(Collectors.toList());
 
         LibraryResponse response = new LibraryResponse();
         response.setMoves(moveDTOs);
-        response.setSessions(Collections.emptyList()); // Mock sessions for now
+        response.setSessions(Collections.emptyList()); // 目前 mock 课程数据
         return response;
     }
 
@@ -61,14 +66,28 @@ public class LibraryServiceImpl implements LibraryService {
         return dto;
     }
 
+    /**
+     * 收藏动作到个人动作库
+     */
     @Override
     public void addItemToLibrary(Map<String, Object> request) {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) request.get("payload");
+        if (payload == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+
+        Object userIdObj = payload.get("userId");
+        Object itemIdObj = payload.get("itemId");
+
+        if (userIdObj == null || itemIdObj == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+
         UserLibrary userLibrary = new UserLibrary();
-        userLibrary.setUserId(Long.valueOf(String.valueOf(payload.get("userId"))));
-        userLibrary.setItemId((String) payload.get("itemId"));
-        userLibrary.setItemType((String) payload.get("itemType"));
+        userLibrary.setUserId(Long.valueOf(String.valueOf(userIdObj)));
+        userLibrary.setItemId(String.valueOf(itemIdObj));
+        userLibrary.setItemType((String) payload.getOrDefault("itemType", "move"));
         userLibraryMapper.insert(userLibrary);
     }
 }

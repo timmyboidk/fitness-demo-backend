@@ -3,6 +3,8 @@ package com.example.fitness.ai.service.impl;
 import com.example.fitness.api.dto.ScoringRequest;
 import com.example.fitness.api.dto.ScoringResponse;
 import com.example.fitness.ai.service.ScoringService;
+import com.example.fitness.common.exception.BusinessException;
+import com.example.fitness.common.result.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -18,10 +20,17 @@ public class UserScoringServiceImpl implements ScoringService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private static final String TOPIC = "frontend_event_stream";
 
+    /**
+     * 计算评分逻辑：目前为 Mock 实现，并同步发送至 Kafka
+     */
     @Override
     public ScoringResponse calculateScore(ScoringRequest request) {
-        // Mock scoring logic
-        int score = new Random().nextInt(40) + 60; // 60-100
+        if (request.getMoveId() == null || request.getMoveId().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+
+        // 模拟评分逻辑：随机生成 60-100 之间的分数
+        int score = new Random().nextInt(40) + 60;
 
         ScoringResponse response = ScoringResponse.builder()
                 .success(true)
@@ -29,13 +38,14 @@ public class UserScoringServiceImpl implements ScoringService {
                 .feedback(new ArrayList<>())
                 .build();
 
-        // Asynchronously send to Kafka for data collection/Doris
+        // 异步发送到 Kafka 供数据收集或后续处理（如 Doris 摄取）
         try {
-            @SuppressWarnings("null")
-            Object unused = kafkaTemplate.send(TOPIC, request.getMoveId(), request);
-            log.info("Sent scoring event to Kafka for move: {}", request.getMoveId());
+            kafkaTemplate.send(TOPIC, request.getMoveId(), request);
+            log.info("已将评分事件发送至 Kafka, 动作 ID: {}", request.getMoveId());
         } catch (Exception e) {
-            log.error("Failed to send to Kafka: {}", e.getMessage());
+            log.error("发送 Kafka 失败: {}", e.getMessage());
+            // 如果 Kafka 发送失败是关键路径，则抛出异常
+            throw new BusinessException(ErrorCode.KAFKA_SEND_ERROR);
         }
 
         return response;

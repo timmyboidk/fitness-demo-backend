@@ -20,7 +20,7 @@ public class UserScoringServiceTest {
     @SuppressWarnings("unchecked")
     public void testCalculateScore() {
         KafkaTemplate<String, Object> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
-        Mockito.when(kafkaTemplate.send(anyString(), any(), any()))
+        Mockito.when(kafkaTemplate.send(any(String.class), any(), any()))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         UserScoringServiceImpl service = new UserScoringServiceImpl(kafkaTemplate);
@@ -32,7 +32,6 @@ public class UserScoringServiceTest {
         Assertions.assertTrue(response.isSuccess());
 
         // Verify Kafka send was called
-        @SuppressWarnings("null")
-        Object verifySend = Mockito.verify(kafkaTemplate).send(eq("frontend_event_stream"), eq("move_1"), eq(req));
+        Mockito.verify(kafkaTemplate).send(eq("frontend_event_stream"), eq("move_1"), eq(req));
     }
 }
