@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,13 +24,14 @@ public class ScoringControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private ScoringService scoringService;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @Test
+    @SuppressWarnings("null")
     public void testScore() throws Exception {
         ScoringResponse mockResponse = new ScoringResponse();
         mockResponse.setSuccess(true);

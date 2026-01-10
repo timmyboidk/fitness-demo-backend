@@ -1,9 +1,9 @@
 package com.example.fitness.user;
 
 import com.example.fitness.api.dto.AuthRequest;
-import com.example.fitness.common.result.Result;
+
 import com.example.fitness.user.mapper.UserMapper;
-import com.example.fitness.user.model.entity.User;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,12 +50,11 @@ public class UserAuthIntegrationTest {
         loginReq.setType("login_phone");
         loginReq.setPayload(payload);
 
-        String loginResponse = mockMvc.perform(post("/api/auth")
+        mockMvc.perform(post("/api/auth")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andReturn().getResponse().getContentAsString();
+                .andExpect(jsonPath("$.success").value(true));
 
         // 2. Onboarding
         Map<String, Object> onboardingReq = new HashMap<>();

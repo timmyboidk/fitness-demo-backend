@@ -31,7 +31,8 @@ public class UserScoringServiceImpl implements ScoringService {
 
         // Asynchronously send to Kafka for data collection/Doris
         try {
-            kafkaTemplate.send(TOPIC, request.getMoveId(), request);
+            @SuppressWarnings("null")
+            Object unused = kafkaTemplate.send(TOPIC, request.getMoveId(), request);
             log.info("Sent scoring event to Kafka for move: {}", request.getMoveId());
         } catch (Exception e) {
             log.error("Failed to send to Kafka: {}", e.getMessage());

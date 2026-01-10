@@ -28,6 +28,7 @@ public class DataCollectionIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
+    @SuppressWarnings("null")
     public void testCollectDataFlow() throws Exception {
         Map<String, Object> req = new HashMap<>();
         req.put("sessionId", "s_999");

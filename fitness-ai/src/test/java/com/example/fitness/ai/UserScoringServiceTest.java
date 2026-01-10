@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.eq;
 public class UserScoringServiceTest {
 
     @Test
+    @SuppressWarnings("unchecked")
     public void testCalculateScore() {
         KafkaTemplate<String, Object> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
         Mockito.when(kafkaTemplate.send(anyString(), any(), any()))
@@ -31,6 +32,7 @@ public class UserScoringServiceTest {
         Assertions.assertTrue(response.isSuccess());
 
         // Verify Kafka send was called
-        Mockito.verify(kafkaTemplate).send(eq("frontend_event_stream"), eq("move_1"), eq(req));
+        @SuppressWarnings("null")
+        Object verifySend = Mockito.verify(kafkaTemplate).send(eq("frontend_event_stream"), eq("move_1"), eq(req));
     }
 }

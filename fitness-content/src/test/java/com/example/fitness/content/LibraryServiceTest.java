@@ -1,11 +1,10 @@
 package com.example.fitness.content;
 
-import com.example.fitness.api.dto.LibraryResponse;
 import com.example.fitness.content.mapper.MoveMapper;
 import com.example.fitness.content.mapper.UserLibraryMapper;
 import com.example.fitness.content.model.entity.UserLibrary;
 import com.example.fitness.content.service.impl.LibraryServiceImpl;
-import org.junit.jupiter.api.Assertions;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

@@ -30,9 +30,6 @@ public class LibraryIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private MoveMapper moveMapper;
-
-    @Autowired
     private UserLibraryMapper userLibraryMapper;
 
     @Autowired
@@ -44,6 +41,7 @@ public class LibraryIntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     public void testGetLibraryAndAddItem() throws Exception {
         // 1. Get Library
         mockMvc.perform(get("/api/library")

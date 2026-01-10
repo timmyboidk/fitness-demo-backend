@@ -52,7 +52,9 @@ public class LibraryServiceImpl implements LibraryService {
         // MoveDTO definition: private Map<String, Object> scoringConfig;
 
         try {
-            dto.setScoringConfig(new ObjectMapper().readValue(move.getScoringConfigJson(), Map.class));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> config = new ObjectMapper().readValue(move.getScoringConfigJson(), Map.class);
+            dto.setScoringConfig(config);
         } catch (Exception e) {
             dto.setScoringConfig(Collections.emptyMap());
         }
@@ -61,6 +63,7 @@ public class LibraryServiceImpl implements LibraryService {
 
     @Override
     public void addItemToLibrary(Map<String, Object> request) {
+        @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) request.get("payload");
         UserLibrary userLibrary = new UserLibrary();
         userLibrary.setUserId(Long.valueOf(String.valueOf(payload.get("userId"))));
