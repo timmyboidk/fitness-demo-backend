@@ -11,11 +11,14 @@ import java.time.LocalDateTime;
  * 用户实体类 - 对应数据库 user 表
  */
 @Data
-@TableName("user")
+@TableName(value = "user", autoResultMap = true)
 public class User {
     @TableId(type = IdType.AUTO)
     private Long id; // 用户 ID
-    private String phone; // 手机号
+
+    @com.baomidou.mybatisplus.annotation.TableField(typeHandler = com.example.fitness.common.handler.EncryptTypeHandler.class)
+    private String phone; // 手机号 (加密存储)
+
     private String nickname; // 昵称
     private String password; // 密码
     private String openId; // 微信 OpenID

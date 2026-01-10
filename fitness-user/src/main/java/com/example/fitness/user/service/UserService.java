@@ -1,5 +1,6 @@
 package com.example.fitness.user.service;
 
+import com.example.fitness.api.dto.LoginRequest;
 import com.example.fitness.api.dto.UserDTO;
 import java.util.Map;
 
@@ -7,12 +8,12 @@ public interface UserService {
     /**
      * 手机号登录
      */
-    UserDTO loginByPhone(Map<String, Object> payload);
+    UserDTO loginByPhone(LoginRequest request);
 
     /**
      * 微信登录
      */
-    UserDTO loginByWechat(Map<String, Object> payload);
+    UserDTO loginByWechat(LoginRequest request);
 
     /**
      * 入职流程设置（如难度等级）

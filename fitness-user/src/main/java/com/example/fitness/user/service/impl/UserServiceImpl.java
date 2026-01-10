@@ -5,12 +5,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import java.util.concurrent.TimeUnit;
+import com.example.fitness.common.annotation.Idempotent;
+import com.example.fitness.common.annotation.RateLimit;
 import com.example.fitness.common.exception.BusinessException;
 import com.example.fitness.common.result.ErrorCode;
 import com.example.fitness.api.dto.UserDTO;
 import com.example.fitness.user.mapper.UserMapper;
 import com.example.fitness.user.model.entity.User;
 import com.example.fitness.user.service.UserService;
+import com.example.fitness.api.dto.LoginRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,25 +37,25 @@ public class UserServiceImpl implements UserService {
      * 手机号登录：如果用户不存在则自动创建
      */
     @Override
-    public UserDTO loginByPhone(Map<String, Object> payload) {
-        String phone = (String) payload.get("phone");
-        if (phone == null || phone.isEmpty()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
-        }
+    @RateLimit(count = 5, time = 1, limitType = RateLimit.LimitType.IP)
+    public UserDTO loginByPhone(LoginRequest request) {
+        String phone = request.getPhone();
+        // @Valid validation handles null checks
 
+        // 手机号自动加密查询（得益于 EncryptTypeHandler）
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
 
         // 用户不存在，执行注册逻辑
         if (user == null) {
             user = new User();
-            user.setPhone(phone);
+            user.setPhone(phone); // 自动加密存储
             user.setNickname("用户 " + phone.substring(phone.length() - 4));
             userMapper.insert(user);
         }
 
         return UserDTO.builder()
                 .id(String.valueOf(user.getId()))
-                .phone(user.getPhone())
+                .phone(user.getPhone()) // 自动解密返回
                 .nickname(user.getNickname())
                 .token("mock_jwt_token_" + user.getId())
                 .build();
@@ -62,11 +65,11 @@ public class UserServiceImpl implements UserService {
      * 微信登录：Mock 实现
      */
     @Override
-    public UserDTO loginByWechat(Map<String, Object> payload) {
-        String code = (String) payload.get("code");
-        if (code == null || code.isEmpty()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
-        }
+    @RateLimit(count = 5, time = 1, limitType = RateLimit.LimitType.IP)
+    public UserDTO loginByWechat(LoginRequest request) {
+        String code = request.getCode();
+        // @Valid validation handles null checks
+
         String openId = "wx_" + code; // Mock 生成 OpenID
 
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getOpenId, openId));
@@ -89,6 +92,7 @@ public class UserServiceImpl implements UserService {
      * 入职逻辑：设置难度等级，并返回对应的评分配置
      */
     @Override
+    @Idempotent(expire = 5)
     public Map<String, Object> onboarding(Map<String, Object> request) {
         String userId = (String) request.get("userId");
         if (userId == null) {
@@ -160,6 +164,7 @@ public class UserServiceImpl implements UserService {
      * 更新用户统计：实际场景中可能同步到 user_stats 表或 Apache Doris
      */
     @Override
+    @Idempotent(expire = 3)
     public void updateUserStats(Map<String, Object> request) {
         if (request == null || request.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
