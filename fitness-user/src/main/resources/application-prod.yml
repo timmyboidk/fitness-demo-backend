@@ -14,7 +14,7 @@ logging:
   file:
     name: /var/logs/fitness/app.log
   level:
-    com.example.fitness: INFO
+    "[com.example.fitness]": INFO
 
 app:
   jwt:

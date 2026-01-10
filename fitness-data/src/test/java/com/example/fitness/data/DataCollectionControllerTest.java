@@ -15,7 +15,6 @@ import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -36,18 +35,17 @@ public class DataCollectionControllerTest {
     private KafkaTemplate<String, Object> kafkaTemplate;
 
     @MockitoBean
-    private CircuitBreakerFactory circuitBreakerFactory;
+    private CircuitBreakerFactory<?, ?> circuitBreakerFactory;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @Test
-    @SuppressWarnings("unchecked")
     public void testCollect() throws Exception {
         // Mock CircuitBreaker
         CircuitBreaker cb = mock(CircuitBreaker.class);
         when(circuitBreakerFactory.create(anyString())).thenReturn(cb);
-        when(cb.run(any(Supplier.class), any(Function.class))).thenAnswer(invocation -> {
+        when(cb.run(any(), any())).thenAnswer(invocation -> {
             Supplier<Object> supplier = invocation.getArgument(0);
             return supplier.get();
         });
@@ -57,8 +55,8 @@ public class DataCollectionControllerTest {
         payload.put("items", "mock");
 
         mockMvc.perform(post("/api/data/collect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(payload)))
+                .contentType(java.util.Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(java.util.Objects.requireNonNull(objectMapper.writeValueAsString(payload))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

@@ -1,8 +1,8 @@
 package com.example.fitness.common.config;
 
 import com.example.fitness.common.handler.EncryptTypeHandler;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,13 +10,17 @@ import org.springframework.stereotype.Component;
  * 初始化数据库加密处理器的密钥
  */
 @Component
+@RequiredArgsConstructor
 public class EncryptionConfig implements InitializingBean {
 
-    @Value("${app.encrypt.key:fitness-demo-key}")
-    private String encryptKey;
+    private final FitnessProperties fitnessProperties;
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        EncryptTypeHandler.setKey(encryptKey);
+        String key = fitnessProperties.getEncrypt().getKey();
+        if (key == null) {
+            key = "fitness-demo-key"; // Fallback
+        }
+        EncryptTypeHandler.setKey(key);
     }
 }

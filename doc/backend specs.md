@@ -2,116 +2,83 @@
 
 ## 1. 架构设计 (Technical Architecture)
 
-**设计理念:** 采用 "模块化单体 (Modular Monolith)" 作为起步架构，预留微服务拆分接口。
-*理由:* 团队初期需快速迭代，微服务会引入过高的运维复杂度（服务发现、分布式事务）。模块化单体保持了代码边界清晰，当单模块（如 AI Scoring）负载过高时，可零成本拆分为独立服务。
+### 1.1 设计理念
+采用 **模块化单体 (Modular Monolith)** 架构。通过清晰的 Maven 模块划分（`fitness-user`, `fitness-content`, `fitness-ai`, `fitness-data`, `fitness-pay`），实现在单一代码仓库中保持高内聚低耦合。未来可根据业务负载（如 AI 模块）轻松剥离为独立微服务。
 
-### 1.1 技术栈选型 (Tech Stack)
-| 领域          | 选型                                         | 为什么要选它?                                                                     |
-| :------------ | :------------------------------------------- | :-------------------------------------------------------------------------------- |
-| **Framework** | **Spring Boot 3.2+ / 4.x** (Java 21 LTS)     | 虚拟线程 (Virtual Threads) 支持高并发，生态最成熟。                               |
-| **ORM**       | **MyBatis-Plus**                             | 在国内开发环境中最通用，内置分页插件和代码生成器，极大提升 CRUD 效率。            |
-| **Database**  | **MySQL 8.0** (Tx) + **Apache Doris** (OLAP) | 事务处理与实时分析分离。Doris 兼容 MySQL 协议，运维成本远低于 Hadoop/ClickHouse。 |
-| **Cache**     | **Redis 7.0**                                | 使用 Redis Cluster 模式，处理 Session、限流令牌桶、排行榜。                       |
-| **MQ**        | **Kafka** (Kraft Mode)                       | 去除 Zookeeper 更轻量。用于异步削峰（埋点日志、支付回调）。                       |
-| **Deploy**    | **Docker** + **K8s** (阿里云 ACK)            | 虽然是单体，但容器化部署为扩容和容灾打基础。                                      |
-
-### 1.2 模块划分 (Module Design)
-项目结构：`fitness-demo-backend` (Maven Multi-module)
-*   `fitness-common`: 公共工具 (Utils, Constants), 统一异常处理, 数据库敏感字段加密 (AES)。
-*   `fitness-api`: 定义 DTO 和通用响应格式。
-*   `fitness-user`: 用户管理、身份认证、社交关系 (WeChat)。
-*   `fitness-content`: 动作库 (Moves)、训练计划 (Sessions)、用户收藏夹。
-*   `fitness-ai`: AI 动作评分逻辑抽象与 Doris 交互。
-*   `fitness-data`: 高吞吐埋点数据采集，包含 Kafka 生产者与降级日志。
+### 1.2 技术栈选型 (Tech Stack)
+| 领域                | 选型              | 版本   | 说明                                                              |
+| :------------------ | :---------------- | :----- | :---------------------------------------------------------------- |
+| **语言**            | **Java 21 (LTS)** | 21     | 核心特性：虚拟线程 (Virtual Threads) 实现海量数据采集的高并发处理 |
+| **框架**            | **Spring Boot**   | 3.5.x  | 现代化的应用框架，内置可观测性支持                                |
+| **数据访问**        | **MyBatis-Plus**  | 3.5.9  | 极速开发 CRUD，支持 Lambda 表达式                                 |
+| **关系型数据库**    | **MySQL**         | 8.0    | 用于核心业务事务 (Tx) 存储                                        |
+| **时序/分析数据库** | **Apache Doris**  | Latest | 经由 Kafka 消费录入，用于大规模埋点数据实时分析                   |
+| **分布式缓存**      | **Redis**         | 7.0    | Session 管理、限流（令牌桶）、用户信息热点缓存                    |
+| **消息队列**        | **Kafka**         | 7.5.0  | 采用 Kraft 模式。用于削峰填谷，连接数据采集与分析层               |
+| **部署容载**        | **Docker + K8s**  | -      | 生产环境基于阿里云 ACK                                            |
 
 ---
 
-## 2. 运维与部署实战 (DevOps & Deployment)
+## 2. 数据库设计 (Database Schema)
 
-### 2.1 部署架构
-*   **开发环境 (Dev):** 单机 Docker Compose (MySQL + Redis + App)。
-*   **生产环境 (Prod):** 阿里云 ACK (Kubernetes)。
-    *   **Ingress:** Nginx Ingress Controller (SSL 卸载, 限流)。
-    *   **Pod 策略:** 至少 2 Replicas，配置 HPA (CPU > 60% 自动扩容)。
+### 2.1 核心表结构
 
-### 2.2 容灾方案 (Disaster Recovery)
-1.  **数据库容灾:** MySQL 开启 MGR (Group Replication) 或阿里云 RDS 高可用版 (一主一备，自动切换)。
-2.  **多可用区 (Multi-AZ):** K8s 节点分布在多个可用区，防止单机房故障。
-3.  **降级策略:** 当 `Kafka` 不可用时，数据采集接口会自动切换为本地磁盘日志记录，保证业务不中断。
+#### 用户表 (`user`)
+| 字段             | 类型        | 描述                  |
+| :--------------- | :---------- | :-------------------- |
+| id               | BIGINT (PK) | 用户唯一 ID (自增)    |
+| phone            | VARCHAR(32) | 手机号 (AES 加密存储) |
+| nickname         | VARCHAR(64) | 用户昵称              |
+| open_id          | VARCHAR(64) | 微信 OpenID (唯一)    |
+| difficulty_level | VARCHAR(32) | NOVICE/SKILLED/EXPERT |
+| total_score      | INT         | 累计评分              |
 
-### 2.3 监控体系
-*   **Logs:** 阿里云 SLS (Log Service) 采集 Console 日志。
-*   **Metrics:** Prometheus (采集 JVM/Tomcat 指标) + Grafana (Dashboard)。
-*   **Trace:** Spring Cloud Sleuth / SkyWalking 链路追踪。
+#### 动作定义表 (`move`)
+| 字段           | 类型         | 描述                           |
+| :------------- | :----------- | :----------------------------- |
+| id             | VARCHAR(32)  | 动作编码 (PK, 如 `m_squat`)    |
+| name           | VARCHAR(64)  | 动作名称                       |
+| difficulty     | VARCHAR(32)  | 适用等级                       |
+| model_url      | VARCHAR(255) | ONNX 模型下载地址              |
+| scoring_config | JSON         | 包含角度阈值、判定灵敏度等配置 |
 
----
+#### 训练课程表 (`training_session`)
+| 字段       | 类型        | 描述                |
+| :--------- | :---------- | :------------------ |
+| id         | BIGINT (PK) | 课程 ID (自增)      |
+| name       | VARCHAR(64) | 课程标题            |
+| difficulty | VARCHAR(32) | 课程整体难度        |
+| duration   | INT         | 预估训练时长 (分钟) |
 
-## 3. 业务逻辑与数据流设计 (Service Logic & Data Flow)
-
-### 3.1 核心业务流量
-1. **用户身份流**:
-   - 用户通过手机号/微信登录 -> `fitness-user` 校验通过 -> 颁发 JWT。
-   - 后续所有请求通过 `Authorization` Header 携带 Token。
-2. **训练内容分发**:
-   - App 根据用户 `difficulty_level` 请求 `fitness-content`。
-   - 后端下发对应的 ONNX 模型路径及评分参数 (Angle Tolerance)。
-3. **实时评分与反馈**:
-   - 客户端 Pose Detection 识别关键点 -> 调用 `fitness-ai` 或本地运行模型 -> 生成即时反馈。
-4. **数据采集流**:
-   - 训练数据异步上传至 `fitness-data` -> 写入 Kafka -> 实时数仓 (Doris) 分析 -> 返回用户统计报表。
-
-### 3.2 数据库模式设计 (Database Schema)
-
-#### `user` (用户主表 - MySQL)
-| 字段             | 类型        | 说明                   |
-| :--------------- | :---------- | :--------------------- |
-| id               | BIGINT (PK) | 用户唯一 ID (自增)     |
-| phone            | VARCHAR     | 手机号 (AES 加密存储)  |
-| nickname         | VARCHAR     | 用户昵称               |
-| difficulty_level | INT         | 1:新手, 2:进阶, 3:专家 |
-| total_score      | BIGINT      | 累计训练积分           |
-| total_duration   | BIGINT      | 累计训练时长 (秒)      |
-
-#### `move` (动作定义表 - MySQL)
-| 字段           | 类型         | 说明                         |
-| :------------- | :----------- | :--------------------------- |
-| id             | VARCHAR (PK) | 动作代码 (如 squat)          |
-| name           | VARCHAR      | 动作展示名称                 |
-| model_url      | VARCHAR      | ONNX 模型文件 URL            |
-| scoring_config | JSON         | 包含角度阀值、判定帧率等配置 |
-
-#### `user_library` (用户内容库 - MySQL)
-| 字段      | 类型    | 说明           |
-| :-------- | :------ | :------------- |
-| user_id   | BIGINT  | 用户 ID        |
-| item_id   | VARCHAR | 动作或方案 ID  |
-| item_type | VARCHAR | move / session |
+#### 课程-动作关系表 (`session_move_relation`)
+| 字段             | 类型   | 描述                     |
+| :--------------- | :----- | :----------------------- |
+| session_id       | BIGINT | 对应课程 ID              |
+| move_id          | BIGINT | 对应动作 ID              |
+| sort_order       | INT    | 在该课中的序号           |
+| duration_seconds | INT    | 该组动作的执行时长或次数 |
 
 ---
 
-## 4. 关键业务模块细节 (Core Modules)
+## 3. API 参考 (API Reference)
 
-### 4.1 社交整合 (Social Integration)
-*   **微信登录流程:**
-    1.  App 端调用微信 SDK 获取 `code`。
-    2.  调用后端 `POST /api/auth { type: "login_wechat" }`。
-    3.  后端通过 `WxMaService` (WxJava SDK) 换取 `openid` 和 `session_key`。
-    4.  若 `openid` 不存在，自动注册；若存在，颁发 JWT。
+所有接口统一采用 RESTful 风格，返回格式遵循通用响应格式：
+```json
+{
+  "success": true,
+  "code": "200",
+  "message": "操作成功",
+  "data": { ... },
+  "timestamp": 1700000000000
+}
+```
 
-### 4.2 数据基础设施 (Data Infrastructure)
-使用 Kafka 作为高吞吐缓冲层，削峰填谷。
-*   **Topic:** `frontend_event_stream`
-*   **Partitions:** 24 (按 `sessionId` Hash 分区)
-*   **降级机制**: 开发者在 `DataCollectionController` 中集成了 CircuitBreaker。当 Kafka 响应过慢或连接失败，数据将直接落盘到 `/tmp/telemetry-fallback.log`。
+### 3.1 身份认证 (`fitness-user`)
 
----
-
-## 5. 认证服务 API (`/api/auth`)
-
+#### 1. 统一登录接口
 **端点:** `POST /api/auth`
 
-### 5.1 手机验证码登录/注册
-**请求体:**
+**请求示例:**
 ```json
 {
   "type": "login_phone",
@@ -119,56 +86,215 @@
   "code": "1234"
 }
 ```
+**字段说明:**
+- `type`: 登录类型，可选 `login_phone` (手机号) 或 `login_wechat` (微信)。
+- `phone`: 手机号，仅在 `type` 为 `login_phone` 时必填。
+- `code`: 验证码或微信授权 `code`。
 
-### 5.2 微信登录
-**请求体:**
+**响应示例:**
 ```json
 {
-  "type": "login_wechat",
-  "code": "wx_code_xyz"
+  "success": true,
+  "data": {
+    "id": "1",
+    "nickname": "GymHero",
+    "phone": "138****8000",
+    "avatar": "https://oss.com/avatar.jpg",
+    "token": "eyJhbG..."
+  }
 }
 ```
+**字段说明:**
+- `id`: 用户唯一 ID。
+- `nickname`: 用户昵称。
+- `phone`: 脱敏后的手机号。
+- `avatar`: 头像链接。
+- `token`: 后续请求需携带的 JWT Token (放入 `Authorization: Bearer <token>`)。
 
-### 5.3 用户初始引导 (Onboarding)
+#### 2. 用户引导/初始化设置
 **端点:** `POST /api/auth/onboarding`
-**请求体:**
+
+**请求示例:**
 ```json
 {
-  "userId": "123",
-  "difficultyLevel": "novice"
+  "userId": "1",
+  "difficultyLevel": "expert"
+}
+```
+**字段说明:**
+- `userId`: 用户 ID。
+- `difficultyLevel`: 设定的初始难度 (`novice`, `skilled`, `expert`)。
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "data": {
+    "scoringTolerance": 5,
+    "recommendedPlan": "plan_starter"
+  }
 }
 ```
 
 ---
 
-## 6. 内容与统计 API
+### 3.2 动作与内容 (`fitness-content`)
 
-### 6.1 获取训练库
+#### 1. 获取内容库
 **端点:** `GET /api/library`
-**说明:** 后端根据登录用户的 Profile 自动返回适配难度的模型地址。
 
-### 6.2 实时评分数据采集
+**请求参数:**
+- `difficultyLevel` (Optional): 难度过滤，默认为 `novice`。
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "data": {
+    "moves": [
+      {
+        "id": "m_squat",
+        "name": "深蹲",
+        "modelUrl": "https://oss.com/squat.onnx",
+        "scoringConfig": { "angleThreshold": 20 }
+      }
+    ],
+    "sessions": [
+      {
+        "id": "s_101",
+        "name": "晨间唤醒",
+        "difficulty": "novice",
+        "duration": 15
+      }
+    ]
+  }
+}
+```
+**字段说明:**
+- `moves`: 动作列表。`scoringConfig` 包含算法判别所需的阈值。
+- `sessions`: 训练课列表。`duration` 为预估分钟数。
+
+---
+
+### 3.3 AI 评分与模型 (`fitness-ai`)
+
+#### 1. 动作实时评分
+**端点:** `POST /api/ai/score`
+
+**请求示例:**
+```json
+{
+  "moveId": "m_squat",
+  "data": {
+    "keypoints": [
+      { "x": 0.5, "y": 0.5, "score": 0.9 }
+    ],
+    "userId": "1"
+  }
+}
+```
+**字段说明:**
+- `moveId`: 正在进行的动作 ID。
+- `data.keypoints`: 人体 17 个关键点坐标及置信度。
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "score": 85,
+    "feedback": ["下蹲深度完美", "注意膝盖不要内扣"]
+  }
+}
+```
+**字段说明:**
+- `score`: 本次动作的得分 (0-100)。
+- `feedback`: 针对性的反馈文本列表。
+
+#### 2. 模型版本检查
+**端点:** `GET /api/core/models/latest`
+
+**请求参数:**
+- `platform`: `ios` 或 `android`。
+- `currentVersion`: 当前设备上的模型版本。
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "data": {
+    "hasUpdate": true,
+    "data": {
+      "version": "1.1.0",
+      "downloadUrl": "https://oss.com/pose_v1.1.onnx",
+      "md5": "a3f8...",
+      "forceUpdate": false
+    }
+  }
+}
+```
+
+---
+
+### 3.4 数据采集 (`fitness-data`)
+
+#### 1. 埋点数据批量上报
 **端点:** `POST /api/data/collect`
-**请求体:**
+
+**请求示例:**
 ```json
 {
   "sessionId": "s_789",
   "items": [
-    {
-      "moveId": "m_squat",
-      "score": 85,
-      "feedbackType": "correct"
-    }
+    { "type": "score", "moveId": "m_squat", "score": 90 },
+    { "type": "heart_rate", "value": 120 }
   ]
 }
 ```
+**字段说明:**
+- `sessionId`: 当前训练会话 ID。
+- `items`: 混合数据项列表，将直接被打入 Kafka。
 
-### 6.3 用户统计同步
-**端点:** `POST /api/user/stats`
-**请求体:**
-```json
-{
-  "userId": "123",
-  "stats": { "totalWorkouts": 10 }
-}
-```
+---
+
+## 4. 数据流转路径 (Data Flow)
+
+### 4.1 核心评分流
+1. **客户端**: 运行 Pose Estimation 获取人体关键点。
+2. **边缘计算 (可选)**: 客户端运行 ONNX 执行初步判定。
+3. **上报**: 调用 `/api/ai/score` 进行云端复核。
+4. **持久化**: 结果通过 Kafka 发送，`fitness-data` 消费者将其存入 MySQL (积分更新) 和 Doris (深度分析)。
+
+### 4.2 模型交付与分发
+1. **供应商/模型组**: 上传训练好的 `.onnx` 文件至 OSS。
+2. **后端管理**: 更新 `move` 表中的 `model_url`。
+
+---
+
+## 5. 模型行为假设与规范 (Model Assumptions & Specifications)
+
+由于 AI 模型目前处于研发/交付阶段，后端逻辑基于以下量化假设构建。请模型组/供应商在交付时以此作为验收基准。
+
+### 5.1 输入数据规范 (Input Expectations)
+*   **关键点格式**: 采用 COCO 17 点标准。后端假设客户端上传的 `keypoints` 包含 `(x, y)` 归一化坐标（范围 `0.0` - `1.0`）及置信度分数 `score`。
+*   **采样频率**: 后端评分接口预期客户端的采样间隔不低于 **10fps**，以确保相似度计算的连续性。
+
+### 5.2 评分算力表现 (Performance Benchmarks)
+*   **单机并发性能**: 
+    - 接口目标响应时间（P99）应控制在 **200ms** 以内。
+    - 在 Java 21 虚拟线程支持下，单个通用型实例（4C8G）应能支撑 **500 QPS** 的评分请求。
+*   **推理引擎兼容性**: 后端模型版本接口通过 MD5 和版本号语义进行分发，假设交付物为 **ONNX OPSet 13+** 兼容格式。
+
+### 5.3 核心算法假设 (Scoring Logic Assumptions)
+| 维度             | 假设说明                                                                                              | 量化指标参考                                   |
+| :--------------- | :---------------------------------------------------------------------------------------------------- | :--------------------------------------------- |
+| **判定准确度**   | 以标准库中的“标准向量”作为 100 分基准，计算用户实时向量的余弦相似度。                                 | $\text{similarity} \ge 0.95$ 判定为“完美”      |
+| **容差调节**     | 通过 `scoring_config` 中的 `angleThreshold` 进行动态缩放。                                            | 每增加 1 度误差，评分加权扣除约 2-3 分         |
+| **用户等级补偿** | 初学者 (`novice`) 在判定时，相似度结果将获得固定 **+10%** 的偏置补偿，以提供更好的反馈激励。          | $\text{final\_score} = \text{base} \times 1.1$ |
+| **反馈时效性**   | 反馈建议列表 (`feedback`) 必须在得分结果生成出的同时，根据偏差最大的关键点索引（Index）自动匹配文本。 | 索引映射响应延迟 $< 50ms$                      |
+
+### 5.4 交付物清单 (Deliverables)
+1.  **ONNX 权重文件**: `.onnx`。
+2.  **动作标准模板**: 一个包含 17 个关键点的 JSON 向量，用于后端进行余弦相似度比对。
+3.  **反馈规则定义**: 一个逻辑映射表，例如：`"left_knee_angle > 120" -> "下蹲不够深"`。

@@ -30,7 +30,6 @@ public class LibraryServiceImpl implements LibraryService {
     private final MoveMapper moveMapper;
     private final UserLibraryMapper userLibraryMapper;
     private final com.example.fitness.content.mapper.SessionMapper sessionMapper;
-    private final com.example.fitness.content.mapper.SessionMoveMapper sessionMoveMapper;
 
     /**
      * 根据难度等级获取动作库

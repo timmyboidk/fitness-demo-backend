@@ -10,7 +10,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.kafka.core.KafkaTemplate;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
@@ -27,11 +27,11 @@ import static org.mockito.ArgumentMatchers.eq;
 public class UserScoringServiceTest {
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({ "unchecked", "null" })
     public void testCalculateScore_PerfectMatch() {
         // 1. Mock Kafka
-        KafkaTemplate kafkaTemplate = Mockito.mock(KafkaTemplate.class);
-        Mockito.when(kafkaTemplate.send(any(String.class), any(), any()))
+        KafkaTemplate<String, Object> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
+        Mockito.when(kafkaTemplate.send(anyString(), any(), any()))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         UserScoringServiceImpl service = new UserScoringServiceImpl(kafkaTemplate);
@@ -62,7 +62,8 @@ public class UserScoringServiceTest {
 
         // 5. 验证 Kafka 发送的是 ScoringResultEvent
         ArgumentCaptor<ScoringResultEvent> eventCaptor = ArgumentCaptor.forClass(ScoringResultEvent.class);
-        Mockito.verify(kafkaTemplate).send(eq("frontend_event_stream"), eq("m_squat"), eventCaptor.capture());
+        Mockito.verify(kafkaTemplate).send(eq("frontend_event_stream"),
+                eq("m_squat"), eventCaptor.capture());
 
         ScoringResultEvent event = eventCaptor.getValue();
         Assertions.assertEquals(100, event.getScore());
@@ -70,9 +71,9 @@ public class UserScoringServiceTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({ "unchecked" })
     public void testCalculateScore_NoKeypoints() {
-        KafkaTemplate kafkaTemplate = Mockito.mock(KafkaTemplate.class);
+        KafkaTemplate<String, Object> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
         UserScoringServiceImpl service = new UserScoringServiceImpl(kafkaTemplate);
 
         ScoringRequest req = new ScoringRequest();

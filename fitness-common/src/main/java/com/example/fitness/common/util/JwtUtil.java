@@ -1,10 +1,11 @@
 package com.example.fitness.common.util;
 
+import com.example.fitness.common.config.FitnessProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -17,16 +18,22 @@ import java.util.Map;
  * 用于生成和解析 JWT Token。
  */
 @Component
+@RequiredArgsConstructor
 public class JwtUtil {
 
-    @Value("${app.jwt.secret:fitness-demo-secret-key-fitness-demo-secret-key}")
-    private String secret;
-
-    @Value("${app.jwt.expiration:86400}")
-    private long expiration; // 默认 24 小时
+    private final FitnessProperties fitnessProperties;
 
     private Key getSigningKey() {
+        String secret = fitnessProperties.getJwt().getSecret();
+        if (secret == null || secret.length() < 32) {
+            secret = "fitness-demo-secret-key-fitness-demo-secret-key"; // Fallback for dev
+        }
         return Keys.hmacShaKeyFor(secret.getBytes());
+    }
+
+    private long getExpiration() {
+        Long exp = fitnessProperties.getJwt().getExpiration();
+        return exp != null ? exp : 86400;
     }
 
     /**
@@ -41,7 +48,7 @@ public class JwtUtil {
                 .setClaims(claims)
                 .setSubject(userId)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000))
+                .setExpiration(new Date(System.currentTimeMillis() + getExpiration() * 1000))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

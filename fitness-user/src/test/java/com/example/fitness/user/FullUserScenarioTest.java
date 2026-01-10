@@ -1,7 +1,5 @@
 package com.example.fitness.user;
 
-import com.example.fitness.api.dto.AuthRequest;
-import com.example.fitness.api.dto.ScoringRequest;
 import com.example.fitness.common.aspect.IdempotentAspect;
 import com.example.fitness.common.aspect.RateLimitAspect;
 import com.fasterxml.jackson.databind.JsonNode;

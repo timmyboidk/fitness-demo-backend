@@ -1,8 +1,5 @@
 package com.example.fitness.ai.service.impl;
 
-import java.time.LocalDateTime;
-import java.util.*;
-
 import com.example.fitness.api.dto.ScoringRequest;
 import com.example.fitness.api.dto.ScoringResponse;
 import com.example.fitness.api.dto.ScoringResultEvent;
@@ -14,7 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Random;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * 用户运动评分服务实现类
@@ -69,16 +70,16 @@ public class UserScoringServiceImpl implements ScoringService {
         // 5. 异步发送到 Kafka
         try {
             String userId = (String) data.getOrDefault("userId", "unknown");
-            com.example.fitness.api.dto.ScoringResultEvent event = com.example.fitness.api.dto.ScoringResultEvent
+            ScoringResultEvent event = ScoringResultEvent
                     .builder()
                     .userId(userId)
                     .moveId(request.getMoveId())
                     .score(score)
-                    .timestamp(java.time.LocalDateTime.now())
-                    .extraData(java.util.Collections.singletonMap("duration", 5)) // 模拟时长
+                    .timestamp(LocalDateTime.now())
+                    .extraData(Collections.singletonMap("duration", 5)) // 模拟时长
                     .build();
 
-            kafkaTemplate.send(TOPIC, request.getMoveId(), event);
+            kafkaTemplate.send(TOPIC, Objects.requireNonNull(request.getMoveId()), event);
             log.info("已将评分事件发送至 Kafka, 动作 ID: {}, 分数: {}", request.getMoveId(), score);
         } catch (Exception e) {
             log.error("发送 Kafka 失败: {}", e.getMessage());

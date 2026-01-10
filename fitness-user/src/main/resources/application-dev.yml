@@ -11,7 +11,7 @@ spring:
 
 logging:
   level:
-    com.example.fitness: DEBUG
+    "[com.example.fitness]": DEBUG
 
 app:
   jwt:

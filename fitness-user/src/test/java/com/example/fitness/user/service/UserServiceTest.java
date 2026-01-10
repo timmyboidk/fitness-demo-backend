@@ -9,7 +9,6 @@ import com.example.fitness.common.util.JwtUtil;
 import com.example.fitness.user.mapper.UserMapper;
 import com.example.fitness.user.model.entity.User;
 import com.example.fitness.user.service.impl.UserServiceImpl;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,11 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -54,8 +48,6 @@ public class UserServiceTest {
 
     @InjectMocks
     private UserServiceImpl userService;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     public void testLoginByPhone_NewUser() {
