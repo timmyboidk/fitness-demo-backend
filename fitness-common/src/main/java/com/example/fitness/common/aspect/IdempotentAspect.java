@@ -38,7 +38,7 @@ public class IdempotentAspect {
         }
         HttpServletRequest request = attributes.getRequest();
 
-        // 1. Generate unique key based on URL, IP, and Args
+        // 1. 根据 URL、IP 和方法参数生成唯一的 Key
         String ip = request.getRemoteAddr();
         String url = request.getRequestURI();
         String args = JSONUtil.toJsonStr(point.getArgs());
@@ -46,10 +46,11 @@ public class IdempotentAspect {
         String source = ip + url + args;
         String key = idempotent.prefix() + SecureUtil.md5(source);
 
-        // 2. Try to set key with expiration (SETNX)
+        // 2. 尝试向 Redis 写入 Key，并设置过期时间 (SETNX)
         Boolean success = redisTemplate.opsForValue().setIfAbsent(key, "1", Duration.ofSeconds(idempotent.expire()));
 
         if (success == null || !success) {
+            // 如果写入失败，说明请求已存在，抛出业务异常
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), idempotent.message());
         }
     }

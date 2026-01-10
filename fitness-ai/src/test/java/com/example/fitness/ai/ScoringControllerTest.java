@@ -18,6 +18,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * AI 评分控制器单元测试
+ */
 @WebMvcTest(ScoringController.class)
 public class ScoringControllerTest {
 
@@ -30,6 +33,9 @@ public class ScoringControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * 测试动作评分接口
+     */
     @Test
     @SuppressWarnings("null")
     public void testScore() throws Exception {

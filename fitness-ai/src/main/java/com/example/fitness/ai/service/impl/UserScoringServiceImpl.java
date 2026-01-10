@@ -13,6 +13,10 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Random;
 
+/**
+ * 用户运动评分服务实现类
+ * 模拟 AI 评分算法生成分数，并将评分事件异步发送至消息队列。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

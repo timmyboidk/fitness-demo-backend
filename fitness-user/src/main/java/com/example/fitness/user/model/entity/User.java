@@ -24,6 +24,10 @@ public class User {
     private String openId; // 微信 OpenID
     private String sessionKey; // 微信会话密钥
     private String difficultyLevel; // 运动难度等级
+
+    /** 创建时间 */
     private LocalDateTime createdAt;
+
+    /** 更新时间 */
     private LocalDateTime updatedAt;
 }

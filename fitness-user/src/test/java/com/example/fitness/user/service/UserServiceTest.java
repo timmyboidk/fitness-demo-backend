@@ -19,6 +19,10 @@ import java.util.concurrent.TimeUnit;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * 用户服务单元测试
+ * 验证首次使用落地流程中的缓存管理逻辑（Cache-Aside 模式）。
+ */
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
 
@@ -36,9 +40,12 @@ public class UserServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 测试首次使用落地：缓存命中场景
+     */
     @Test
     public void testOnboarding_CacheHit() throws Exception {
-        // Arrange
+        // 准备数据
         String userId = "1";
         User user = new User();
         user.setId(1L);
@@ -52,23 +59,26 @@ public class UserServiceTest {
         request.put("userId", userId);
         request.put("difficultyLevel", "expert");
 
-        // Act
+        // 执行动作
         userService.onboarding(request);
 
-        // Assert
-        // 1. Verify DB select was NOT called (Cache Hit)
+        // 验证断言
+        // 1. 验证数据库查询未被调用（缓存命中）
         verify(userMapper, times(0)).selectById(userId);
 
-        // 2. Verify Update was called
+        // 2. 验证更新方法被调用
         verify(userMapper, times(1)).updateById(any(User.class));
 
-        // 3. Verify Cache Invalidation (Delete) was called
+        // 3. 验证缓存失效（删除）被调用，保证一致性
         verify(redisTemplate, times(1)).delete("user:profile:" + userId);
     }
 
+    /**
+     * 测试首次使用落地：缓存未命中场景
+     */
     @Test
     public void testOnboarding_CacheMiss() throws Exception {
-        // Arrange
+        // 准备数据
         String userId = "2";
         User user = new User();
         user.setId(2L);
@@ -82,21 +92,21 @@ public class UserServiceTest {
         request.put("userId", userId);
         request.put("difficultyLevel", "intermediate");
 
-        // Act
+        // 执行动作
         userService.onboarding(request);
 
-        // Assert
-        // 1. Verify DB select WAS called (Cache Miss)
+        // 验证断言
+        // 1. 验证数据库查询被调用（缓存未命中）
         verify(userMapper, times(1)).selectById(userId);
 
-        // 2. Verify Redis Set WAS called (Write Back)
+        // 2. 验证回写 Redis 被调用
         verify(valueOperations, times(1)).set(eq("user:profile:" + userId), anyString(), eq(3600L),
                 eq(TimeUnit.SECONDS));
 
-        // 3. Verify Update was called
+        // 3. 验证更新方法被调用
         verify(userMapper, times(1)).updateById(any(User.class));
 
-        // 4. Verify Cache Invalidation was called
+        // 4. 验证缓存失效（删除）被调用
         verify(redisTemplate, times(1)).delete("user:profile:" + userId);
     }
 }

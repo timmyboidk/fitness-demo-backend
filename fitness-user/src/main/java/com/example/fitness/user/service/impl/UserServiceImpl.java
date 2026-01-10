@@ -21,6 +21,11 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 用户服务实现类
+ * 提供用户登录、首次使用落地流程管理和统计数据更新等功能。
+ * 使用了 Redis 缓存方案降低数据库负载。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -89,7 +94,7 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 入职逻辑：设置难度等级，并返回对应的评分配置
+     * 首次使用落地逻辑：设置难度等级，并返回对应的评分配置
      */
     @Override
     @Idempotent(expire = 5)

@@ -15,9 +15,19 @@ import java.time.LocalDateTime;
 public class Move {
     @TableId(type = IdType.INPUT)
     private String id; // 动作唯一标识 (如 m_squat)
-    private String name; // 动作名称
-    private String difficulty; // 难度等级 (novice | skilled | expert)
-    private String modelUrl; // AI 模型下载地址
-    private String scoringConfigJson; // 评分配置 (存储为 JSON 字符串)
+
+    /** 动作名称 */
+    private String name;
+
+    /** 难度等级 (novice | skilled | expert) */
+    private String difficulty;
+
+    /** AI 模型下载地址 */
+    private String modelUrl;
+
+    /** 评分配置 (存储为 JSON 字符串) */
+    private String scoringConfigJson;
+
+    /** 创建时间 */
     private LocalDateTime createdAt;
 }

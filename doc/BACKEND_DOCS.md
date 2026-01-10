@@ -64,13 +64,13 @@ docker-compose up -d mysql redis kafka zookeeper
 
 ## 5. API 参考
 
-| 功能         | 方法   | 路径                   | 关键 Payload                                               |
-| :----------- | :----- | :--------------------- | :--------------------------------------------------------- |
-| 手机登录     | `POST` | `/api/auth`            | `{ "type": "login_phone", "payload": { "phone": "..." } }` |
-| 入职设置     | `POST` | `/api/auth/onboarding` | `{"userId": "1", "difficultyLevel": "expert"}`             |
-| 获取动作库   | `GET`  | `/api/library`         | `?difficultyLevel=novice`                                  |
-| AI 评分      | `POST` | `/api/ai/score`        | `{"moveId": "m_squat", "data": { ... } }`                  |
-| 批量数据收集 | `POST` | `/api/data/collect`    | `{"sessionId": "...", "items": [...]}`                     |
+| 功能             | 方法   | 路径                   | 关键 Payload                                               |
+| :--------------- | :----- | :--------------------- | :--------------------------------------------------------- |
+| 手机登录         | `POST` | `/api/auth`            | `{ "type": "login_phone", "payload": { "phone": "..." } }` |
+| 首次使用落地设置 | `POST` | `/api/auth/onboarding` | `{"userId": "1", "difficultyLevel": "expert"}`             |
+| 获取动作库       | `GET`  | `/api/library`         | `?difficultyLevel=novice`                                  |
+| AI 评分          | `POST` | `/api/ai/score`        | `{"moveId": "m_squat", "data": { ... } }`                  |
+| 批量数据收集     | `POST` | `/api/data/collect`    | `{"sessionId": "...", "items": [...]}`                     |
 
 ## 6. 可观测性 (Observability)
 

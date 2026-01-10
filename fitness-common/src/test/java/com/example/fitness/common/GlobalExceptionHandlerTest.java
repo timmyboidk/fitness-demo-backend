@@ -6,10 +6,16 @@ import com.example.fitness.common.result.Result;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 全局异常处理器单元测试
+ */
 public class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
+    /**
+     * 测试普通运行时异常的处理
+     */
     @Test
     public void testHandleException() {
         Exception e = new RuntimeException("runtime error");

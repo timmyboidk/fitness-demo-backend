@@ -4,6 +4,10 @@ import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import java.io.Serializable;
 
+/**
+ * 登录请求 DTO
+ * 用于封装用户通过手机号或微信登录时的请求参数。
+ */
 @Data
 public class LoginRequest implements Serializable {
 

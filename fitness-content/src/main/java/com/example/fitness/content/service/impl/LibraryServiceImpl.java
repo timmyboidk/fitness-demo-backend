@@ -19,6 +19,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 健身内容库服务实现类
+ * 负责健身动作在数据库中的查询、转换以及用户个人库的管理。
+ */
 @Service
 @RequiredArgsConstructor
 public class LibraryServiceImpl implements LibraryService {

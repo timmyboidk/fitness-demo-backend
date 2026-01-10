@@ -21,6 +21,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * 认证控制器单元测试
+ */
 @WebMvcTest(AuthController.class)
 public class AuthControllerTest {
 
@@ -33,6 +36,9 @@ public class AuthControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * 测试手机号登录接口
+     */
     @Test
     public void testLoginPhone() throws Exception {
         UserDTO mockUser = UserDTO.builder().id("u1").nickname("test").token("t1").build();

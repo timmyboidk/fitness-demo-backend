@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * 认证控制器 - 处理用户登录、入职流程及数据统计
+ * 认证控制器 - 处理用户登录、首次使用落地流程及数据统计
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -34,7 +34,7 @@ public class AuthController {
     }
 
     /**
-     * 入职流程/首次设置接口
+     * 首次使用落地流程/首次设置接口
      * 
      * @param request 包含用户ID和难度等级
      * @return 返回系统配置（如评分容差）

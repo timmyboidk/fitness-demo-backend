@@ -13,8 +13,14 @@ import java.util.concurrent.CompletableFuture;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
+/**
+ * 用户评分服务单元测试
+ */
 public class UserScoringServiceTest {
 
+    /**
+     * 测试评分计算逻辑及 Kafka 消息发送
+     */
     @Test
     @SuppressWarnings({ "unchecked", "null" })
     public void testCalculateScore() {

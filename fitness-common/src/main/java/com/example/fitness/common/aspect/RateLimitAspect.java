@@ -32,16 +32,20 @@ public class RateLimitAspect {
 
     private final StringRedisTemplate redisTemplate;
 
+    /**
+     * 限流核心逻辑：使用 Lua 脚本保证原子性
+     */
     @Before("@annotation(rateLimit)")
     @SuppressWarnings("null")
     public void doBefore(JoinPoint point, RateLimit rateLimit) {
         int time = rateLimit.time();
         int count = rateLimit.count();
 
+        // 1. 获取唯一的限流 Key
         String combineKey = getCombineKey(rateLimit, point);
         List<String> keys = Collections.singletonList(combineKey);
 
-        // Lua script for atomic increment and expiry
+        // 2. Lua 脚本逻辑：检查累计访问次数。如果不存在则初始化并设置过期时间；如果未超限则递增。
         String luaScript = "if redis.call('get', KEYS[1]) == false then " +
                 "redis.call('set', KEYS[1], 1) " +
                 "redis.call('expire', KEYS[1], ARGV[1]) " +
@@ -57,6 +61,7 @@ public class RateLimitAspect {
         Long number = redisTemplate.execute(redisScript, keys, String.valueOf(time), String.valueOf(count));
 
         if (number != null && number == 0) {
+            log.warn("接口限流触发: key={}", combineKey);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), "访问过于频繁，请稍候再试");
         }
     }

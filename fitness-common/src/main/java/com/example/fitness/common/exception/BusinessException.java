@@ -3,6 +3,10 @@ package com.example.fitness.common.exception;
 import com.example.fitness.common.result.ErrorCode;
 import lombok.Getter;
 
+/**
+ * 自定义业务异常类
+ * 用于在业务逻辑中主动抛出可控的错误信息。
+ */
 @Getter
 public class BusinessException extends RuntimeException {
     private final Integer code;

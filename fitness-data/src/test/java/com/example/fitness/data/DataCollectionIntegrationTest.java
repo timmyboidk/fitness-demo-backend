@@ -16,6 +16,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * 数据采集模块集成测试
+ * 验证从 Controller 接收数据到 Kafka 发送的完整链路（使用测试配置）。
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -27,6 +31,9 @@ public class DataCollectionIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * 测试数据收集流
+     */
     @Test
     @SuppressWarnings("null")
     public void testCollectDataFlow() throws Exception {
@@ -39,8 +46,7 @@ public class DataCollectionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        // In a real integration test, we would also verify the message was consumed.
-        // For this demo, we'll rely on logs and end-to-end manual verification if
-        // needed.
+        // 注意：在真实的集成测试中，我们还需要验证消息是否被 Kafka 成功消费并同步。
+        // 在本演示项目中，我们主要通过日志和链路状态进行端到端验证。
     }
 }
