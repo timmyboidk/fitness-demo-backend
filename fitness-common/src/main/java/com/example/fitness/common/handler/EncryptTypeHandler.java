@@ -18,16 +18,31 @@ import java.sql.SQLException;
  */
 public class EncryptTypeHandler extends BaseTypeHandler<String> {
 
-    // 实际生产中应从配置文件读取，这里为演示固定 Key (16 chars)
-    private static final byte[] KEYS = "fitness-demo-key".getBytes(StandardCharsets.UTF_8);
-    private static final AES AES = SecureUtil.aes(KEYS);
+    private static AES aes;
+
+    /**
+     * 设置加密密钥，由外部配置类初始化时调用
+     */
+    public static void setKey(String key) {
+        if (StringUtils.hasText(key)) {
+            aes = SecureUtil.aes(key.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private AES getAes() {
+        if (aes == null) {
+            // 以此作为 fallback 或抛出异常
+            aes = SecureUtil.aes("default-fallback-key".getBytes(StandardCharsets.UTF_8));
+        }
+        return aes;
+    }
 
     @Override
     public void setNonNullParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType)
             throws SQLException {
         if (StringUtils.hasText(parameter)) {
             // 加密存储
-            ps.setString(i, AES.encryptBase64(parameter));
+            ps.setString(i, getAes().encryptBase64(parameter));
         } else {
             ps.setString(i, parameter);
         }
@@ -55,7 +70,7 @@ public class EncryptTypeHandler extends BaseTypeHandler<String> {
         if (StringUtils.hasText(value)) {
             try {
                 // 解密返回
-                return AES.decryptStr(value);
+                return getAes().decryptStr(value);
             } catch (Exception e) {
                 // 解密失败（可能是老数据未加密），返回原值
                 return value;

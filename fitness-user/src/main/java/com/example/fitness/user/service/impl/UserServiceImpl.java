@@ -1,6 +1,7 @@
 package com.example.fitness.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,7 +18,12 @@ import com.example.fitness.api.dto.LoginRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import cn.binarywang.wx.miniapp.api.WxMaService;
+import cn.binarywang.wx.miniapp.bean.WxMaJscode2SessionResult;
+import com.example.fitness.common.util.JwtUtil;
+import me.chanjar.weixin.common.error.WxErrorException;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,11 +35,13 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     private final UserMapper userMapper;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JwtUtil jwtUtil;
+    private final WxMaService wxMaService;
 
     private static final String USER_CACHE_KEY_PREFIX = "user:profile:";
     private static final long USER_CACHE_TTL = 3600; // 1小时缓存
@@ -44,53 +52,61 @@ public class UserServiceImpl implements UserService {
     @Override
     @RateLimit(count = 5, time = 1, limitType = RateLimit.LimitType.IP)
     public UserDTO loginByPhone(LoginRequest request) {
-        String phone = request.getPhone();
-        // @Valid validation handles null checks
+        // 1. 校验验证码 (开发环境跳过，生产环境应比对 Redis)
+        // String cachedCode = redisTemplate.opsForValue().get("sms:code:" +
+        // request.getPhone());
+        // if (!request.getCode().equals(cachedCode)) throw new
+        // BusinessException(ErrorCode.PARAM_ERROR, "验证码错误");
 
-        // 手机号自动加密查询（得益于 EncryptTypeHandler）
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
-
-        // 用户不存在，执行注册逻辑
+        // 2. 查询或注册用户
+        User user = lambdaQuery().eq(User::getPhone, request.getPhone()).one();
         if (user == null) {
             user = new User();
-            user.setPhone(phone); // 自动加密存储
-            user.setNickname("用户 " + phone.substring(phone.length() - 4));
-            userMapper.insert(user);
+            user.setPhone(request.getPhone());
+            user.setNickname("User_" + request.getPhone().substring(7));
+            user.setCreatedAt(LocalDateTime.now());
+            user.setUpdatedAt(LocalDateTime.now());
+            save(user);
         }
 
-        return UserDTO.builder()
-                .id(String.valueOf(user.getId()))
-                .phone(user.getPhone()) // 自动解密返回
-                .nickname(user.getNickname())
-                .token("mock_jwt_token_" + user.getId())
-                .build();
+        // 3. 生成真实 JWT Token
+        String token = jwtUtil.generateToken(String.valueOf(user.getId()));
+
+        // 4. 封装返回
+        return convertToDTO(user, token);
     }
 
     /**
-     * 微信登录：Mock 实现
+     * 微信登录
      */
     @Override
     @RateLimit(count = 5, time = 1, limitType = RateLimit.LimitType.IP)
     public UserDTO loginByWechat(LoginRequest request) {
-        String code = request.getCode();
-        // @Valid validation handles null checks
+        String openId;
+        try {
+            // 1. 调用微信接口获取 openId
+            WxMaJscode2SessionResult session = wxMaService.getUserService().getSessionInfo(request.getCode());
+            openId = session.getOpenid();
+        } catch (WxErrorException e) {
+            log.error("微信登录失败: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.LOGIN_FAILED, "微信授权失败");
+        }
 
-        String openId = "wx_" + code; // Mock 生成 OpenID
-
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getOpenId, openId));
+        // 2. 查询或注册用户
+        User user = lambdaQuery().eq(User::getOpenId, openId).one();
         if (user == null) {
             user = new User();
             user.setOpenId(openId);
-            user.setNickname("微信用户");
-            userMapper.insert(user);
+            user.setNickname("Wechat User");
+            user.setCreatedAt(LocalDateTime.now());
+            user.setUpdatedAt(LocalDateTime.now());
+            save(user);
         }
 
-        return UserDTO.builder()
-                .id(String.valueOf(user.getId()))
-                .nickname(user.getNickname())
-                .avatar("https://api.dicebear.com/7.x/avataaars/svg?seed=" + user.getId())
-                .token("mock_wx_token_" + user.getId())
-                .build();
+        // 3. 生成真实 Token
+        String token = jwtUtil.generateToken(String.valueOf(user.getId()));
+
+        return convertToDTO(user, token);
     }
 
     /**
@@ -175,5 +191,15 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
         }
         log.info("正在更新用户统计信息: {}", request);
+    }
+
+    private UserDTO convertToDTO(User user, String token) {
+        return UserDTO.builder()
+                .id(String.valueOf(user.getId()))
+                .phone(user.getPhone())
+                .nickname(user.getNickname())
+                .avatar(user.getAvatar())
+                .token(token)
+                .build();
     }
 }

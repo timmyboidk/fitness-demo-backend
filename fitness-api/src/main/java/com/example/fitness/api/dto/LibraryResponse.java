@@ -10,5 +10,5 @@ import java.util.List;
 @Data
 public class LibraryResponse {
     private List<MoveDTO> moves;
-    private List<Object> sessions; // Using Object for now as Session DTO might not exist
+    private List<SessionDTO> sessions;
 }

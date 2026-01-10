@@ -1,6 +1,30 @@
-server:
-  port: 8080
-  shutdown: graceful
+spring:
+  profiles:
+    active: dev
+  application:
+    name: fitness-user
+  main:
+    allow-bean-definition-overriding: true
+  threads:
+    virtual:
+      enabled: true
+  
+  # Base Kafka Config
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      batch-size: 65536
+      buffer-memory: 67108864
+      acks: 1
+      retries: 3
+    consumer:
+      group-id: fitness-data-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        '[spring.json.trusted.packages]': "*"
 
 wx:
   miniapp:
@@ -9,42 +33,6 @@ wx:
     token: ${WX_TOKEN:token88888}
     aesKey: ${WX_AES_KEY:aesKey88888888}
     msgDataFormat: JSON
-
-spring:
-  lifecycle:
-    timeout-per-shutdown-phase: 30s
-  application:
-    name: fitness-user
-  main:
-    allow-bean-definition-overriding: true
-  threads:
-    virtual:
-      enabled: true
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql:3306/fitness_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root
-
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      # High Throughput Optimization (10k QPS)
-      batch-size: 65536 # 64KB batch size
-      buffer-memory: 67108864 # 64MB buffer
-      acks: 1 # Leader only for low latency
-      retries: 3
-      properties:
-        "[linger.ms]": 10
-    consumer:
-      group-id: fitness-data-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        '[spring.json.trusted.packages]': "*"
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml

@@ -29,23 +29,45 @@ public class LibraryServiceImpl implements LibraryService {
 
     private final MoveMapper moveMapper;
     private final UserLibraryMapper userLibraryMapper;
+    private final com.example.fitness.content.mapper.SessionMapper sessionMapper;
+    private final com.example.fitness.content.mapper.SessionMoveMapper sessionMoveMapper;
 
     /**
      * 根据难度等级获取动作库
      */
     @Override
     public LibraryResponse getLibrary(String difficulty) {
-        // 从数据库查询
+        // 1. 查询动作 (Moves)
         List<Move> moves = moveMapper.selectList(new LambdaQueryWrapper<Move>()
                 .eq(Move::getDifficulty, difficulty));
-
-        // 将实体类转换为 DTO
         List<MoveDTO> moveDTOs = moves.stream().map(this::convertToDTO).collect(Collectors.toList());
+
+        // 2. 查询课程 (Sessions)
+        List<com.example.fitness.content.model.entity.Session> sessions = sessionMapper.selectList(
+                new LambdaQueryWrapper<com.example.fitness.content.model.entity.Session>()
+                        .eq(com.example.fitness.content.model.entity.Session::getDifficulty, difficulty));
+
+        List<com.example.fitness.api.dto.SessionDTO> sessionDTOs = sessions.stream()
+                .map(this::convertToSessionDTO)
+                .collect(Collectors.toList());
 
         LibraryResponse response = new LibraryResponse();
         response.setMoves(moveDTOs);
-        response.setSessions(Collections.emptyList()); // 目前 mock 课程数据
+        response.setSessions(sessionDTOs);
         return response;
+    }
+
+    private com.example.fitness.api.dto.SessionDTO convertToSessionDTO(
+            com.example.fitness.content.model.entity.Session session) {
+        return com.example.fitness.api.dto.SessionDTO.builder()
+                .id(String.valueOf(session.getId()))
+                .name(session.getName())
+                .difficulty(session.getDifficulty())
+                .duration(session.getDuration())
+                .coverUrl(session.getCoverUrl())
+                // 列表接口暂不填充具体的动作列表，需单独调用详情接口
+                .moves(Collections.emptyList())
+                .build();
     }
 
     private MoveDTO convertToDTO(Move move) {
@@ -53,13 +75,6 @@ public class LibraryServiceImpl implements LibraryService {
         dto.setId(move.getId());
         dto.setName(move.getName());
         dto.setModelUrl(move.getModelUrl());
-        // Simple manual JSON parsing or use ObjectMapper (injected)
-        // For simplicity/robustness in demo, we can just hardcode or parse simply if
-        // needed.
-        // Assuming scoringConfigJson is valid JSON.
-        // Using a simple Map for config in DTO?
-        // MoveDTO definition: private Map<String, Object> scoringConfig;
-
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> config = new ObjectMapper().readValue(move.getScoringConfigJson(), Map.class);
