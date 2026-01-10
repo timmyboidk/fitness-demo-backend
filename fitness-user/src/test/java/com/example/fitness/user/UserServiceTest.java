@@ -2,6 +2,7 @@ package com.example.fitness.user;
 
 import com.example.fitness.api.dto.UserDTO;
 import com.example.fitness.user.mapper.UserMapper;
+import com.example.fitness.user.model.entity.User;
 import com.example.fitness.user.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
@@ -46,9 +50,26 @@ public class UserServiceTest {
     @Test
     public void testOnboarding() {
         Map<String, Object> req = new HashMap<>();
+        req.put("userId", "123");
         req.put("difficultyLevel", "expert");
 
+        User user = new User();
+        user.setId(123L);
+        when(userMapper.selectById("123")).thenReturn(user);
+
         Map<String, Object> config = userService.onboarding(req);
+
+        verify(userMapper, times(1)).updateById(any(User.class));
         Assertions.assertEquals(5, config.get("scoringTolerance"));
+    }
+
+    @Test
+    public void testUpdateUserStats() {
+        Map<String, Object> req = new HashMap<>();
+        req.put("userId", "123");
+        req.put("stats", new HashMap<>());
+
+        userService.updateUserStats(req);
+        // Stub just logs for now
     }
 }
