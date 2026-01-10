@@ -1,5 +1,6 @@
 package com.example.fitness.data;
 
+import com.example.fitness.integration.IntegrationTestApp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 数据采集模块集成测试
  * 验证从 Controller 接收数据到 Kafka 发送的完整链路（使用测试配置）。
  */
-@SpringBootTest
+@SpringBootTest(classes = IntegrationTestApp.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class DataCollectionIntegrationTest {

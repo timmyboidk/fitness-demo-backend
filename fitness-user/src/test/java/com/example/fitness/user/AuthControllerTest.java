@@ -2,6 +2,7 @@ package com.example.fitness.user;
 
 import com.example.fitness.api.dto.AuthRequest;
 import com.example.fitness.api.dto.UserDTO;
+import com.example.fitness.common.util.JwtUtil;
 import com.example.fitness.user.controller.AuthController;
 import com.example.fitness.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,9 @@ public class AuthControllerTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private JwtUtil jwtUtil; // Mock JwtUtil for WebConfig/LoginInterceptor
 
     @Autowired
     private ObjectMapper objectMapper;

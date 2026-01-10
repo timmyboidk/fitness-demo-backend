@@ -1,3 +1,29 @@
 spring:
+  datasource:
+    url: jdbc:h2:mem:fitness_data_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
   kafka:
     bootstrap-servers: localhost:9092
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cloud:
+    compatibility-verifier:
+      enabled: false
+
+app:
+  jwt:
+    secret: test-secret-key-1234567890-very-long-and-secure-key-for-hmac-sha256
+    expiration: 3600
+  encrypt:
+    key: test-encrypt-key
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.example.fitness.**.model.entity
+  # No global type handlers to correspond with fix in fitness-user
+  configuration:
+    map-underscore-to-camel-case: true

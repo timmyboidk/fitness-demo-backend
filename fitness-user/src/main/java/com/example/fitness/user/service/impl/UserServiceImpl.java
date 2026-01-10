@@ -59,14 +59,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // BusinessException(ErrorCode.PARAM_ERROR, "验证码错误");
 
         // 2. 查询或注册用户
-        User user = lambdaQuery().eq(User::getPhone, request.getPhone()).one();
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, request.getPhone()));
         if (user == null) {
             user = new User();
             user.setPhone(request.getPhone());
             user.setNickname("User_" + request.getPhone().substring(7));
             user.setCreatedAt(LocalDateTime.now());
             user.setUpdatedAt(LocalDateTime.now());
-            save(user);
+            userMapper.insert(user);
         }
 
         // 3. 生成真实 JWT Token
@@ -93,14 +93,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         // 2. 查询或注册用户
-        User user = lambdaQuery().eq(User::getOpenId, openId).one();
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getOpenId, openId));
         if (user == null) {
             user = new User();
             user.setOpenId(openId);
             user.setNickname("Wechat User");
             user.setCreatedAt(LocalDateTime.now());
             user.setUpdatedAt(LocalDateTime.now());
-            save(user);
+            userMapper.insert(user);
         }
 
         // 3. 生成真实 Token

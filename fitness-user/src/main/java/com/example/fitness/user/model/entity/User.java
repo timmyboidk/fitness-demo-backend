@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 用户实体类 - 对应数据库 user 表
  */
 @Data
-@TableName(value = "user", autoResultMap = true)
+@TableName(value = "`user`")
 public class User {
     @TableId(type = IdType.AUTO)
     private Long id; // 用户 ID

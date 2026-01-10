@@ -1,5 +1,11 @@
 package com.example.fitness.user.service;
 
+import cn.binarywang.wx.miniapp.api.WxMaService;
+import cn.binarywang.wx.miniapp.api.WxMaUserService;
+import cn.binarywang.wx.miniapp.bean.WxMaJscode2SessionResult;
+import com.example.fitness.api.dto.LoginRequest;
+import com.example.fitness.api.dto.UserDTO;
+import com.example.fitness.common.util.JwtUtil;
 import com.example.fitness.user.mapper.UserMapper;
 import com.example.fitness.user.model.entity.User;
 import com.example.fitness.user.service.impl.UserServiceImpl;
@@ -12,16 +18,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
  * 用户服务单元测试
- * 验证首次使用落地流程中的缓存管理逻辑（Cache-Aside 模式）。
  */
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
@@ -35,78 +43,92 @@ public class UserServiceTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private JwtUtil jwtUtil;
+
+    @Mock
+    private WxMaService wxMaService;
+
+    @Mock
+    private WxMaUserService wxMaUserService;
+
     @InjectMocks
     private UserServiceImpl userService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * 测试首次使用落地：缓存命中场景
-     */
     @Test
-    public void testOnboarding_CacheHit() throws Exception {
-        // 准备数据
-        String userId = "1";
-        User user = new User();
-        user.setId(1L);
-        user.setDifficultyLevel("novice");
-        String userJson = objectMapper.writeValueAsString(user);
+    public void testLoginByPhone_NewUser() {
+        // Setup
+        LoginRequest req = new LoginRequest();
+        req.setPhone("13800138000");
+        req.setCode("1234");
 
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("user:profile:" + userId)).thenReturn(userJson);
+        when(userMapper.selectOne(any())).thenReturn(null); // User not found
+        when(jwtUtil.generateToken(anyString())).thenReturn("mock-token");
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(100L); // simulate database generating ID
+            return 1;
+        });
 
-        Map<String, Object> request = new HashMap<>();
-        request.put("userId", userId);
-        request.put("difficultyLevel", "expert");
+        // Execute
+        UserDTO result = userService.loginByPhone(req);
 
-        // 执行动作
-        userService.onboarding(request);
-
-        // 验证断言
-        // 1. 验证数据库查询未被调用（缓存命中）
-        verify(userMapper, times(0)).selectById(userId);
-
-        // 2. 验证更新方法被调用
-        verify(userMapper, times(1)).updateById(any(User.class));
-
-        // 3. 验证缓存失效（删除）被调用，保证一致性
-        verify(redisTemplate, times(1)).delete("user:profile:" + userId);
+        // Verify
+        assertNotNull(result);
+        assertEquals("100", result.getId());
+        assertEquals("mock-token", result.getToken());
+        verify(userMapper, times(1)).insert(any(User.class));
     }
 
-    /**
-     * 测试首次使用落地：缓存未命中场景
-     */
     @Test
-    public void testOnboarding_CacheMiss() throws Exception {
-        // 准备数据
-        String userId = "2";
-        User user = new User();
-        user.setId(2L);
-        user.setDifficultyLevel("novice");
+    public void testLoginByPhone_ExistingUser() {
+        // Setup
+        LoginRequest req = new LoginRequest();
+        req.setPhone("13800138000");
 
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("user:profile:" + userId)).thenReturn(null);
-        when(userMapper.selectById(userId)).thenReturn(user);
+        User existingUser = new User();
+        existingUser.setId(200L);
+        existingUser.setPhone("13800138000");
+        existingUser.setNickname("OldUser");
 
-        Map<String, Object> request = new HashMap<>();
-        request.put("userId", userId);
-        request.put("difficultyLevel", "intermediate");
+        when(userMapper.selectOne(any())).thenReturn(existingUser);
+        when(jwtUtil.generateToken("200")).thenReturn("mock-existing-token");
 
-        // 执行动作
-        userService.onboarding(request);
+        // Execute
+        UserDTO result = userService.loginByPhone(req);
 
-        // 验证断言
-        // 1. 验证数据库查询被调用（缓存未命中）
-        verify(userMapper, times(1)).selectById(userId);
+        // Verify
+        assertNotNull(result);
+        assertEquals("200", result.getId());
+        assertEquals("mock-existing-token", result.getToken());
+        verify(userMapper, times(0)).insert(any(User.class));
+    }
 
-        // 2. 验证回写 Redis 被调用
-        verify(valueOperations, times(1)).set(eq("user:profile:" + userId), anyString(), eq(3600L),
-                eq(TimeUnit.SECONDS));
+    @Test
+    public void testLoginByWechat_Success() throws Exception {
+        LoginRequest req = new LoginRequest();
+        req.setCode("wx-code");
 
-        // 3. 验证更新方法被调用
-        verify(userMapper, times(1)).updateById(any(User.class));
+        WxMaJscode2SessionResult session = new WxMaJscode2SessionResult();
+        session.setOpenid("mock-openid");
 
-        // 4. 验证缓存失效（删除）被调用
-        verify(redisTemplate, times(1)).delete("user:profile:" + userId);
+        when(wxMaService.getUserService()).thenReturn(wxMaUserService);
+        when(wxMaUserService.getSessionInfo("wx-code")).thenReturn(session);
+        when(userMapper.selectOne(any())).thenReturn(null); // New user
+        when(jwtUtil.generateToken(anyString())).thenReturn("wx-token");
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(300L);
+            return 1;
+        });
+
+        UserDTO result = userService.loginByWechat(req);
+
+        assertEquals("300", result.getId());
+        assertEquals("wx-token", result.getToken());
+        verify(wxMaUserService).getSessionInfo("wx-code");
+        verify(userMapper).insert(any(User.class));
     }
 }
