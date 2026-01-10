@@ -28,6 +28,12 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # High Throughput Optimization (10k QPS)
+      batch-size: 65536 # 64KB batch size
+      linger-ms: 10 # Wait 10ms to group batches
+      buffer-memory: 67108864 # 64MB buffer
+      acks: 1 # Leader only for low latency
+      retries: 3
     consumer:
       group-id: fitness-data-group
       auto-offset-reset: earliest
