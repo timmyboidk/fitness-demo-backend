@@ -13,11 +13,6 @@ wx:
 spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
   application:
     name: fitness-user
   main:
@@ -57,3 +52,9 @@ mybatis-plus:
   type-handlers-package: com.example.fitness.common.handler
   configuration:
     map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
