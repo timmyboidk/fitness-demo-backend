@@ -68,15 +68,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             user.setUpdatedAt(LocalDateTime.now());
             try {
                 userMapper.insert(user);
-            } catch (org.springframework.dao.DuplicateKeyException e) {
+            } catch (Exception e) {
                 // 并发注册处理：虽然 user == null，但 insert 时遇到 duplicate key
-                // 重新查询用户并返回
-                User existingUser = userMapper
-                        .selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, request.getPhone()));
-                if (existingUser != null) {
-                    user = existingUser;
+                // 检查是否为唯一键冲突
+                if (e.getMessage().contains("Duplicate entry")
+                        || (e.getCause() != null && e.getCause().getMessage().contains("Duplicate entry"))) {
+                    // 重新查询用户并返回
+                    User existingUser = userMapper
+                            .selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, request.getPhone()));
+                    if (existingUser != null) {
+                        user = existingUser;
+                    } else {
+                        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "注册失败，请稍后重试");
+                    }
                 } else {
-                    throw e; // 理论上不应到达此处，抛出异常
+                    if (e instanceof RuntimeException) {
+                        throw (RuntimeException) e;
+                    } else {
+                        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, e.getMessage());
+                    }
                 }
             }
         }

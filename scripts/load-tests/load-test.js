@@ -4,13 +4,13 @@ import exec from 'k6/execution';
 
 export const options = {
     stages: [
-        { duration: '30s', target: 5 }, // Ramp to 5 users
-        { duration: '1m', target: 5 }, // Stay at 5
-        { duration: '10s', target: 0 }, // Ramp down
+        { duration: '2m', target: 1000 },
+        { duration: '1m', target: 1000 },
+        { duration: '1m', target: 0 },
     ],
 };
 
-const BASE_URL = 'http://fitness-backend:8080'; // Use service name in Docker network
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 export default function () {
     // 1. Login
@@ -19,9 +19,11 @@ export default function () {
         phone: `139${exec.vu.idInTest.toString().padStart(4, '0')}${exec.scenario.iterationInTest.toString().padStart(4, '0')}`
     });
 
+    const fakeIp = `${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
     const params = {
         headers: {
             'Content-Type': 'application/json',
+            'X-Forwarded-For': fakeIp,
         },
     };
 

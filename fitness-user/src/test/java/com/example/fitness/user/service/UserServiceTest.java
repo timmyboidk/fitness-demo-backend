@@ -10,6 +10,7 @@ import com.example.fitness.user.mapper.UserMapper;
 import com.example.fitness.user.model.entity.User;
 import com.example.fitness.user.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.Test;
+import java.util.Map;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -122,5 +123,90 @@ public class UserServiceTest {
         assertEquals("wx-token", result.getToken());
         verify(wxMaUserService).getSessionInfo("wx-code");
         verify(userMapper).insert(any(User.class));
+    }
+
+    @Test
+    public void testLoginByPhone_ConcurrentRegistration_Idempotency() {
+        // Setup
+        LoginRequest req = new LoginRequest();
+        req.setPhone("13900000000");
+
+        User existingUser = new User();
+        existingUser.setId(400L);
+        existingUser.setPhone("13900000000");
+
+        when(userMapper.selectOne(any())).thenReturn(null) // First check returns null
+                .thenReturn(existingUser); // Second check (after exception) returns found user
+
+        when(jwtUtil.generateToken(anyString())).thenReturn("idempotent-token");
+        when(userMapper.insert(any(User.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate key"));
+
+        // Execute
+        UserDTO result = userService.loginByPhone(req);
+
+        // Verify
+        assertNotNull(result);
+        assertEquals("400", result.getId());
+        assertEquals("idempotent-token", result.getToken());
+        verify(userMapper, times(2)).selectOne(any()); // Called twice
+    }
+
+    @Test
+    public void testOnboarding_Success() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("userId", "500");
+        req.put("difficultyLevel", "expert");
+
+        User user = new User();
+        user.setId(500L);
+
+        // Mock getUserForProfile
+        // Cache miss
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn(null);
+        when(userMapper.selectById("500")).thenReturn(user);
+
+        // Execute
+        Map<String, Object> result = userService.onboarding(req);
+
+        // Verify
+        assertNotNull(result);
+        assertEquals(5, result.get("scoringTolerance")); // expert -> 5
+        verify(userMapper).updateById(user);
+        verify(redisTemplate).delete(anyString());
+    }
+
+    @Test
+    public void testUpdateUserStats() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("userId", "600");
+        userService.updateUserStats(req);
+        // Just verify no exception
+    }
+
+    @Test
+    public void testLoginByWechat_Failure() throws Exception {
+        LoginRequest req = new LoginRequest();
+        req.setCode("bad-code");
+
+        when(wxMaService.getUserService()).thenReturn(wxMaUserService);
+        when(wxMaUserService.getSessionInfo("bad-code"))
+                .thenThrow(new me.chanjar.weixin.common.error.WxErrorException("Failed"));
+
+        try {
+            userService.loginByWechat(req);
+        } catch (com.example.fitness.common.exception.BusinessException e) {
+            assertEquals(1004, e.getCode()); // LOGIN_FAILED
+        }
+    }
+
+    @Test
+    public void testUpdateUserStats_Null() {
+        try {
+            userService.updateUserStats(null);
+        } catch (com.example.fitness.common.exception.BusinessException e) {
+            assertEquals(400, e.getCode()); // PARAM_ERROR
+        }
     }
 }

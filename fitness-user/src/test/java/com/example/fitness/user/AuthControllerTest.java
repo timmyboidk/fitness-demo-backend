@@ -61,4 +61,68 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value("u1"));
     }
+
+    @Test
+    public void testLoginWechat() throws Exception {
+        UserDTO mockUser = UserDTO.builder().id("u2").nickname("wx").token("t2").build();
+        Mockito.when(userService.loginByWechat(any())).thenReturn(mockUser);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("code", "wx123");
+        AuthRequest request = new AuthRequest();
+        request.setType("login_wechat");
+        request.setPayload(payload);
+
+        mockMvc.perform(post("/api/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value("u2"));
+    }
+
+    @Test
+    public void testOnboarding() throws Exception {
+        Map<String, Object> response = new HashMap<>();
+        response.put("config", "val");
+        Mockito.when(userService.onboarding(any())).thenReturn(response);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("userId", "u1");
+
+        mockMvc.perform(post("/api/auth/onboarding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.config").value("val"));
+    }
+
+    @Test
+    public void testUpdateStats() throws Exception {
+        Mockito.doNothing().when(userService).updateUserStats(any());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("userId", "u1");
+
+        mockMvc.perform(post("/api/auth/user/stats")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    public void testLoginUnknownType() throws Exception {
+        AuthRequest request = new AuthRequest();
+        request.setType("unknown");
+        request.setPayload(new HashMap<>());
+
+        mockMvc.perform(post("/api/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("不支持的登录类型"));
+    }
 }
