@@ -11,19 +11,19 @@ graph TD
     classDef service fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
 
     %% 节点
-    root[fitness-demo-backend<br/>(后端根项目)]:::root
+    root["fitness-demo-backend<br/>(后端根项目)"]:::root
     
     subgraph 基础模块
-        common[fitness-common<br/>(通用模块)]:::base
-        api[fitness-api<br/>(接口定义)]:::base
+        common["fitness-common<br/>(通用模块)"]:::base
+        api["fitness-api<br/>(接口定义)"]:::base
     end
 
     subgraph 业务微服务
-        user[fitness-user<br/>(用户服务)]:::service
-        content[fitness-content<br/>(内容服务)]:::service
-        pay[fitness-pay<br/>(支付服务)]:::service
-        data[fitness-data<br/>(数据服务)]:::service
-        ai[fitness-ai<br/>(AI服务)]:::service
+        user["fitness-user<br/>(用户服务)"]:::service
+        content["fitness-content<br/>(内容服务)"]:::service
+        pay["fitness-pay<br/>(支付服务)"]:::service
+        data["fitness-data<br/>(数据服务)"]:::service
+        ai["fitness-ai<br/>(AI服务)"]:::service
     end
 
     %% 根继承关系
