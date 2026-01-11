@@ -66,7 +66,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             user.setNickname("User_" + request.getPhone().substring(7));
             user.setCreatedAt(LocalDateTime.now());
             user.setUpdatedAt(LocalDateTime.now());
-            userMapper.insert(user);
+            try {
+                userMapper.insert(user);
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                // 并发注册处理：虽然 user == null，但 insert 时遇到 duplicate key
+                // 重新查询用户并返回
+                User existingUser = userMapper
+                        .selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, request.getPhone()));
+                if (existingUser != null) {
+                    user = existingUser;
+                } else {
+                    throw e; // 理论上不应到达此处，抛出异常
+                }
+            }
         }
 
         // 3. 生成真实 JWT Token

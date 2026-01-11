@@ -1,31 +1,24 @@
 package com.example.fitness.user;
 
-import com.example.fitness.api.dto.AuthRequest;
-
+import com.example.fitness.AbstractIntegrationTest;
+import com.example.fitness.api.dto.LoginRequest;
 import com.example.fitness.user.mapper.UserMapper;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.HashMap;
 import java.util.Map;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
 @Transactional
-public class UserAuthIntegrationTest {
+public class UserAuthIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -44,11 +37,9 @@ public class UserAuthIntegrationTest {
     @Test
     public void testFullOnboardingFlow() throws Exception {
         // 1. Login
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("phone", "13912345678");
-        AuthRequest loginReq = new AuthRequest();
+        LoginRequest loginReq = new LoginRequest();
         loginReq.setType("login_phone");
-        loginReq.setPayload(payload);
+        loginReq.setPhone("13912345678");
 
         mockMvc.perform(post("/api/auth")
                 .contentType(MediaType.APPLICATION_JSON)

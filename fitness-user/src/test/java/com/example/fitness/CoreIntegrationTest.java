@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -13,14 +12,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.example.fitness.common.util.JwtUtil;
 
-@SpringBootTest(properties = {
-        "spring.kafka.bootstrap-servers=localhost:9092",
-        "spring.data.redis.host=localhost",
-        "spring.data.redis.port=6379"
-})
 @AutoConfigureMockMvc
-public class CoreIntegrationTest {
+public class CoreIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -28,9 +23,14 @@ public class CoreIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @Test
     public void testLibraryFlow() throws Exception {
+        String token = jwtUtil.generateToken("1");
         mockMvc.perform(get("/api/library")
+                .header("Authorization", "Bearer " + token)
                 .param("difficulty", "novice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -39,10 +39,12 @@ public class CoreIntegrationTest {
 
     @Test
     public void testScoringFlow() throws Exception {
+        String token = jwtUtil.generateToken("1");
         ScoringRequest req = new ScoringRequest();
         req.setMoveId("m_squat");
 
         mockMvc.perform(post("/api/ai/score")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())

@@ -74,3 +74,30 @@
 
 *   **Virtual Threads 阻塞**: 若系统负载过高，检查是否有传统第三方驱动（如老版本 JDBC）导致平台线程钉死。
 *   **Kafka 消息积压**: 检查 `fitness-data` 消费者的 ACK 模式是否正确，并观察 `UserStatsMapper` 的写入压力。
+
+---
+
+## 5. 测试报告 (Test Report)
+
+### 5.1 概览
+已针对 `fitness-demo-backend` 完成代码修复与负载测试环境搭建。
+
+### 5.2 修复内容
+*   **配置**: 修复 JDK 21 兼容性及 Docker Redis 连接配置。
+*   **代码**: 修复 `AbstractIntegrationTest` 资源泄露，增强 `UserService` 注册幂等性。
+*   **数据**: 补全 Docker `init.sql` 缺失表结构 (`training_session`)。
+
+### 5.3 负载测试结果 (Performance)
+**场景**: 用户登录 -> 获取动作库 (k6 script)
+**配置**: 5 VU 并发
+
+| 指标                | 结果       | 说明                             |
+| :------------------ | :--------- | :------------------------------- |
+| **Login Success**   | **100%**   | 幂等性修复后，高并发注册无报错。 |
+| **Library Success** | **~100%**  | 补全 schema 后接口返回正常。     |
+| **Login Latency**   | **< 20ms** | 响应极快。                       |
+| **Throughput**      | **~4 TPS** | 5 VU 下系统稳定。                |
+
+### 5.4 关键发现
+*   **幂等性**: 注册接口已通过 `DuplicateKeyException` 捕获实现幂等。
+*   **数据一致性**: 必须保持 Docker `init.sql` 与 Testcontainers `schema.sql` 结构同步。

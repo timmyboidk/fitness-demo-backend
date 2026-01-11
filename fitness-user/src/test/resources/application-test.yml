@@ -11,6 +11,9 @@ spring:
   cloud:
     compatibility-verifier:
       enabled: false
+  sql:
+    init:
+      mode: always
 
 app:
   jwt:

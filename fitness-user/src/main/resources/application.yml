@@ -3,6 +3,9 @@ spring:
     active: dev
   application:
     name: fitness-user
+  cloud:
+    compatibility-verifier:
+      enabled: false
   main:
     allow-bean-definition-overriding: true
   threads:

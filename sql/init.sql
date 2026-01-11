@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS `user` (
     `open_id` VARCHAR(64) DEFAULT NULL UNIQUE,
     `session_key` VARCHAR(64) DEFAULT NULL,
     `difficulty_level` VARCHAR(32) DEFAULT 'novice',
+    `total_score` INT DEFAULT 0,
+    `total_duration` INT DEFAULT 0,
+    `avatar` VARCHAR(500) DEFAULT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -30,3 +33,22 @@ CREATE TABLE IF NOT EXISTS `move` (
 
 INSERT INTO `move` (`id`, `name`, `difficulty`, `model_url`, `scoring_config_json`) VALUES 
 ('m_squat', 'Squat', 'novice', 'https://oss.example.com/squat.onnx', '{"angleThreshold": 20, "holdTime": 2}');
+
+CREATE TABLE IF NOT EXISTS `training_session` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(100) NOT NULL,
+    `difficulty` VARCHAR(20),
+    `duration` INT,
+    `cover_url` VARCHAR(500),
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `session_move_relation` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `session_id` BIGINT NOT NULL,
+    `move_id` BIGINT NOT NULL,
+    `sort_order` INT DEFAULT 0,
+    `duration_seconds` INT DEFAULT 0,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
