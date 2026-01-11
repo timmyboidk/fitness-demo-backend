@@ -88,14 +88,12 @@ sequenceDiagram
     deactivate ContentSvc
 
     %% 3. AI 阶段
-    Note over User, App: 3. 实时 AI 交互
+    Note over User, App: 3. 端侧实时 AI 交互 (离线推理)
     User->>App: 开始训练 (视频流采集)
-    loop 实时姿态分析
-        App->>AISvc: 上传视频帧 / 流
-        activate AISvc
-        AISvc->>AISvc: AI 推理 (姿态检测)
-        AISvc-->>App: 实时反馈 (动作纠正)
-        deactivate AISvc
+    loop 实时姿态分析 (Local)
+        App->>App: 加载本地 ONNX 模型
+        App->>App: 逐帧推理 (Pose Detection)
+        App-->>User: 实时反馈 (动作纠正)
     end
     
     App->>AISvc: POST /api/score (最终评分)
