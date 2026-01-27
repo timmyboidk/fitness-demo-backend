@@ -6,8 +6,18 @@ spring:
     url: jdbc:mysql://localhost:3306/fitness_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: root
+    hikari:
+      maximum-pool-size: 50 # 针对 1000 并发调优，配合 Virtual Threads
+      minimum-idle: 10
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 3000
   kafka:
     bootstrap-servers: localhost:29092
+    listener:
+      concurrency: 3 # 增加消费者并发度
+      ack-mode: batch # 启用批量确认
+      type: batch     # 批量监听模式
 
 logging:
   level:

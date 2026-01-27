@@ -25,9 +25,12 @@ public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
-        // 放行 Swagger 和 静态资源
+        // 放行 Swagger 和 静态资源 (在 WebConfig 中已排除，此处作为双重保障)
         String uri = request.getRequestURI();
-        if (uri.contains("swagger") || uri.contains("api-docs") || uri.contains("webjars")) {
+        // 忽略大小写检查
+        String lowerUri = uri.toLowerCase();
+        if (lowerUri.contains("swagger") || lowerUri.contains("api-docs") || lowerUri.contains("webjars")
+                || lowerUri.contains("/error")) {
             return true;
         }
 

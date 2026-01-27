@@ -89,18 +89,22 @@ public class UserScoringServiceImpl implements ScoringService {
         return response;
     }
 
+    // 缓存标准动作模板，避免重复创建对象
+    private static final Map<String, double[]> STANDARD_TEMPLATE_CACHE;
+
+    static {
+        double[] defaultVector = new double[34];
+        java.util.Arrays.fill(defaultVector, 0.5);
+
+        // 预加载模板 (实际项目应从数据库或 OSS 加载缓存)
+        STANDARD_TEMPLATE_CACHE = Map.of(
+                "m_squat", defaultVector
+        // 可添加更多动作
+        );
+    }
+
     private double[] getStandardTemplate(String moveId) {
-        // 简单模拟：假设标准化后的向量为全 1 或特定模式
-        // 实际中应存储 17 个关键点 (x,y) 的归一化向量，共 34 维
-        if ("m_squat".equals(moveId)) {
-            double[] v = new double[34];
-            java.util.Arrays.fill(v, 0.5);
-            return v;
-        }
-        // 默认模板
-        double[] v = new double[34];
-        java.util.Arrays.fill(v, 0.5);
-        return v;
+        return STANDARD_TEMPLATE_CACHE.getOrDefault(moveId, STANDARD_TEMPLATE_CACHE.values().iterator().next());
     }
 
     private double[] normalizeKeypoints(List<Map<String, Object>> keypoints) {

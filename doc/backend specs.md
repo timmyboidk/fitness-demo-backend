@@ -298,3 +298,60 @@
 1.  **ONNX 权重文件**: `.onnx`。
 2.  **动作标准模板**: 一个包含 17 个关键点的 JSON 向量，用于后端进行余弦相似度比对。
 3.  **反馈规则定义**: 一个逻辑映射表，例如：`"left_knee_angle > 120" -> "下蹲不够深"`。
+
+---
+
+## 6. 技术演进与性能优化策略 (Technical Strategy)
+
+针对 1000+ 并发用户及未来扩展需求，制定以下架构演进与优化策略。
+
+### 6.1 微服务拆分策略 (Microservice Decomposition)
+为应对 AI 评分模块 (`fitness-ai`) 日益增长的计算密集型负载，计划将其从单体中剥离。
+
+*   **服务边界定义**:
+    *   **Scoring Service (AI 核心)**: 独立部署，负责无状态的 `OpenCV/ONNX` 推理与相似度计算。独占 GPU 或高频 CPU 资源。
+    *   **Data Service (数据湖)**: 负责海量埋点数据的清洗与落库。
+*   **Shared Kernel (共享内核)**:
+    *   仅共享 DTO (`ScoringRequest`, `MoveDTO`) 与基础工具类 (`MathUtil`, `JwtUtil`)。
+    *   通过 Maven BOM 管理版本，避免依赖地狱。
+*   **通信协议**:
+    *   **同步 (实时评分)**: 采用 **gRPC (Protobuf)** 替代 HTTP REST，以在服务间获得更低延迟（< 5ms）和更小的传输体积。
+    *   **异步 (数据采集)**: 维持 Kafka 管道，解耦评分产生与数据分析。
+
+### 6.2 高并发性能调优 (Performance Tuning)
+
+为确保在 Java 21 虚拟线程环境下实现 P99 < 200ms：
+
+#### 数据库连接池 (HikariCP)
+*   **问题**: Virtual Threads 数目庞大，但数据库连接是稀缺物理资源。
+*   **配置优化**:
+    *   `maximum-pool-size`: 设置为 **50-60**。过大不仅无益，反而导致上下文切换开销。
+    *   `connection-timeout`: 缩短至 **3000ms**，快速失败，避免线程长时间阻塞。
+    *   **防钉死 (Pinning)**: 确保 MySQL 驱动更新至 **8.3+**，避免在 `synchronized` 块中进行 I/O 操作导致虚拟线程无法卸载 (Unmount)。
+
+#### Kafka 消费者优化
+*   **ACK 模式**: 调整为 `Batch` 模式。
+    *   `spring.kafka.listener.ack-mode: batch`
+    *   `spring.kafka.listener.type: batch`
+*   **吞吐量**:
+    *   增加 `concurrency` 至 **3-5** (根据分区数)。
+    *   Database Batch Insert: 消费者端积累 100~500 条记录后，使用 MyBatis-Plus 的 `saveBatch` 一次性写入，避免单条 Insert 造成的 RTT 浪费。
+
+### 6.3 移动端协同与数据同步 (Mobile-to-Cloud Synergy)
+
+针对 React Native 前端与 Spring Boot 后端的交互，最大限度降低移动端功耗与延迟。
+
+1.  **端侧推理优先 (Edge AI)**:
+    *   利用 `ONNX Runtime Web/Mobile` 在手机本地进行 `Keypoints` 提取与初步评分 (Level 1)。
+    *   **优势**: 零网络延迟，保护隐私，极大节省带宽。
+    *   **云端复核**: 仅在“结算”或“挑战模式”下，抽样上传关键点至云端进行防作弊校验。
+
+2.  **数据同步协议 (Data Sync)**:
+    *   **Protocol Buffers**: 替代 JSON。关键点数组 (`float[]`) 使用 Protobuf 序列化可减少 **60%** 数据体积。
+    *   **WebSocket / QUIC**: 建立长连接通道。
+        *   避免 HTTP 1.1 的频繁握手开销。
+        *   支持双向实时反馈（如教练端实时纠正）。
+
+3.  **电量优化**:
+    *   **批量上报**: 非实时类数据（如心率历史）缓存于本地 SQLite/Realm，仅在 WiFi 环境或每隔 60秒批量压缩上传。
+    *   **差异化更新**: 仅同步模型参数的变更部分 (`Diff`), 而非全量下载新模型。
