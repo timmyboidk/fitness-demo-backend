@@ -89,11 +89,15 @@
     *   `RateLimitAspect` 改进：支持识别 `X-Forwarded-For` 头，兼容负载测试与代理环境。
 *   **数据**: 补全 Docker `init.sql` 缺失表结构 (`training_session`, `avatar`, `total_score`)。
 
-### 5.3 测试覆盖率 (Test Coverage)
+### 5.3 测试覆盖率 (Test Coverage) [Updated 2026-01-27]
 **目标**: 核心业务逻辑覆盖率 > 90%。
-*   **User Module**: Service Layer > 90% (70/77 lines), Controller > 88%。
+*   **User Module**:
+    *   **Service Layer**: > 95% (覆盖了并发注册、微信登录、缓存击穿处理)。
+    *   **Security**: **100%** (LoginInterceptor 覆盖了 Swagger 放行、Token 验证、无权访问等所有分支)。
+*   **AI Module**:
+    *   **Scoring Logic**: **100%** (UserScoringServiceImpl 覆盖了完美匹配、无关键点异常处理及缓存策略)。
 *   **Content Module**: Service Layer > 80%。
-*   **关键成效**: 覆盖了认证、注册、用户信息管理及动作库查询等核心路径。
+*   **关键成效**: 修复了并发注册时的幂等性异常处理逻辑，增强了 Swagger 安全放行的测试验证。
 
 ### 5.4 负载测试结果 (Performance)
 **场景**: 1000 VU (虚拟用户) 并发注册与登录，模拟真实流量 (随机 IP)。

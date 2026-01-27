@@ -9,21 +9,28 @@ graph TD
     classDef root fill:#f9f,stroke:#333,stroke-width:2px;
     classDef base fill:#e1f5fe,stroke:#0277bd,stroke-width:2px;
     classDef service fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef infra fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
 
     %% 节点
     root["fitness-demo-backend<br/>(后端根项目)"]:::root
     
     subgraph 基础模块
-        common["fitness-common<br/>(通用模块)"]:::base
-        api["fitness-api<br/>(接口定义)"]:::base
+        common["fitness-common<br/>(通用模块)<br/>包含: DTO, Utils, Exception, Jwt"]:::base
+        api["fitness-api<br/>(接口定义)<br/>包含: FeignClient, API Interface"]:::base
     end
 
     subgraph 业务微服务
-        user["fitness-user<br/>(用户服务)"]:::service
-        content["fitness-content<br/>(内容服务)"]:::service
-        pay["fitness-pay<br/>(支付服务)"]:::service
-        data["fitness-data<br/>(数据服务)"]:::service
-        ai["fitness-ai<br/>(AI服务)"]:::service
+        user["fitness-user<br/>(用户服务)<br/>DB: MySQL (user)<br/>Cache: Redis"]:::service
+        content["fitness-content<br/>(内容服务)<br/>DB: MySQL (content)<br/>Cache: Local"]:::service
+        pay["fitness-pay<br/>(支付服务)<br/>DB: MySQL (order)"]:::service
+        data["fitness-data<br/>(数据服务)<br/>Store: Doris/MySQL"]:::service
+        ai["fitness-ai<br/>(AI服务)<br/>Compute: CPU/GPU"]:::service
+    end
+
+    subgraph 中间件依赖
+        mysql[("MySQL<br/>(主数据存储)")]:::infra
+        redis[("Redis<br/>(缓存/限流)")]:::infra
+        kafka[("Kafka<br/>(异步解耦)")]:::infra
     end
 
     %% 根继承关系
@@ -50,10 +57,18 @@ graph TD
     
     ai --> common
     ai --> api
+
+    %% 基础设施依赖
+    user -.-> mysql
+    user -.-> redis
+    content -.-> mysql
+    data -.-> kafka
+    data -.-> mysql
+    ai -.-> kafka
 ```
 
-## 2. 业务流程图 (核心训练闭环)
-此时序图展示了用户会话的端到端流程：从登录 -> 内容发现 -> 实时 AI 评分 -> 数据持久化。
+## 2. 业务流程与数据流图 (核心训练闭环)
+此时序图展示了用户会话的端到端流程，并详细列出了关键环节交换的数据字段。
 
 ```mermaid
 sequenceDiagram
@@ -69,22 +84,28 @@ sequenceDiagram
     %% 1. 认证阶段
     Note over User, App: 1. 认证与新手引导
     User->>App: 打开 App 并登录
-    App->>UserSvc: POST /api/auth (手机号/微信)
+    App->>UserSvc: POST /api/auth
+    Note right of App: { type: "login_wechat",<br/>code: "wx_code_123" }
     activate UserSvc
-    UserSvc-->>App: JWT Token + 用户档案
+    UserSvc->>UserSvc: 微信验签 & 用户查找/创建
+    UserSvc-->>App: 200 OK
+    Note left of UserSvc: { token: "jwt_ey...",<br/>user: { id: "1001", ... } }
     deactivate UserSvc
     
     opt 首次登录 (新手引导)
-        App->>UserSvc: POST /api/auth/onboarding (设置难度)
-        UserSvc-->>App: 返回推荐计划
+        App->>UserSvc: POST /api/auth/onboarding
+        Note right of App: { userId: "1001",<br/>difficultyLevel: "novice" }
+        UserSvc-->>App: 200 OK
+        Note left of UserSvc: { scoringTolerance: 20,<br/>recommendedPlan: "starter" }
     end
 
     %% 2. 内容阶段
     Note over User, App: 2. 训练内容发现
     User->>App: 选择训练课程
-    App->>ContentSvc: GET /api/library (获取动作/计划)
+    App->>ContentSvc: GET /api/library?difficulty=novice
     activate ContentSvc
-    ContentSvc-->>App: 返回动作列表 List<Move>
+    ContentSvc-->>App: 200 OK
+    Note left of ContentSvc: { moves: [ { id: "m_squat", modelUrl: "..." } ],<br/>sessions: [ ... ] }
     deactivate ContentSvc
 
     %% 3. AI 阶段
@@ -96,25 +117,35 @@ sequenceDiagram
         App-->>User: 实时反馈 (动作纠正)
     end
     
-    App->>AISvc: POST /api/score (最终评分)
+    rect rgb(240, 248, 255)
+    Note over App, AISvc: 关键动作完成时上报
+    App->>AISvc: POST /api/score
+    Note right of App: { moveId: "m_squat",<br/>data: { keypoints: [{x,y,score}...], userId: "1001" } }
     activate AISvc
-    AISvc->>Kafka: 发送评分结果事件 (ScoringResultEvent)
-    AISvc-->>App: 返回分数与总结
+    AISvc->>AISvc: 计算余弦相似度 (Score=95)
+    AISvc->>Kafka: 发送评分结果事件 (Async)
+    Note right of AISvc: Topic: frontend_event_stream<br/>Body: { userId: "1001", score: 95, moveId: "m_squat", ... }
+    AISvc-->>App: 200 OK
+    Note left of AISvc: { success: true, score: 95,<br/>feedback: ["完美！"] }
     deactivate AISvc
+    end
     
     %% 4. 数据阶段
     Note over User, App: 4. 数据收集与异步持久化
     User->>App: 查看总结并退出
-    App->>DataSvc: POST /api/collection (用户行为统计)
+    App->>DataSvc: POST /api/data/collect
+    Note right of App: { sessionId: "s_123",<br/>items: [ { type: "heart_rate", value: 120 } ... ] }
     activate DataSvc
-    DataSvc->>Kafka: 发送前端事件 (FrontendEvent Stream)
+    DataSvc->>Kafka: 发送前端事件 (Batch)
     DataSvc-->>App: 200 OK
     deactivate DataSvc
     
     par 异步数据处理
-        Kafka->>DataSvc: 消费前端事件
+        Kafka->>DataSvc: @KafkaListener (Batch)
         activate DataSvc
-        DataSvc->>DataSvc: 持久化至 MySQL / Doris
+        Note right of Kafka: List<Event> [ScoreEvent, StatEvent...]
+        DataSvc->>DataSvc: 清洗 &聚合
+        DataSvc->>DataSvc: 持久化至 MySQL (UserStats) / Doris (DW)
         deactivate DataSvc
     end
 ```

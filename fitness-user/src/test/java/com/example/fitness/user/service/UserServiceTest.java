@@ -140,7 +140,8 @@ public class UserServiceTest {
 
         when(jwtUtil.generateToken(anyString())).thenReturn("idempotent-token");
         when(userMapper.insert(any(User.class)))
-                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate key"));
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                        "Duplicate entry '13900000000' for key 'user.phone'"));
 
         // Execute
         UserDTO result = userService.loginByPhone(req);
