@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,5 +55,40 @@ public class ScoringControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.score").value(90));
+    }
+
+    /**
+     * 测试获取最新AI模型版本 - iOS平台
+     */
+    @Test
+    public void testGetLatestModel_iOS() throws Exception {
+        mockMvc.perform(get("/api/core/models/latest")
+                .param("platform", "ios")
+                .param("currentVersion", "1.0.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.hasUpdate").value(true))
+                .andExpect(jsonPath("$.data.data.version").value("1.1.0"))
+                .andExpect(
+                        jsonPath("$.data.data.downloadUrl").value("https://oss.fitness.com/models/pose_v1.1_ios.onnx"))
+                .andExpect(jsonPath("$.data.data.forceUpdate").value(false))
+                .andExpect(jsonPath("$.data.data.releaseNotes").value("Optimized for latest devices."));
+    }
+
+    /**
+     * 测试获取最新AI模型版本 - Android平台
+     */
+    @Test
+    public void testGetLatestModel_Android() throws Exception {
+        mockMvc.perform(get("/api/core/models/latest")
+                .param("platform", "android")
+                .param("currentVersion", "1.0.5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.hasUpdate").value(true))
+                .andExpect(jsonPath("$.data.data.version").value("1.1.0"))
+                .andExpect(jsonPath("$.data.data.downloadUrl")
+                        .value("https://oss.fitness.com/models/pose_v1.1_android.onnx"))
+                .andExpect(jsonPath("$.data.data.md5").value("a3f8..."));
     }
 }

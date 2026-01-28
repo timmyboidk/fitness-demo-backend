@@ -210,4 +210,165 @@ public class UserServiceTest {
             assertEquals(400, e.getCode()); // PARAM_ERROR
         }
     }
+
+    @Test
+    public void testUpdateUserStats_EmptyMap() {
+        try {
+            userService.updateUserStats(new java.util.HashMap<>());
+        } catch (com.example.fitness.common.exception.BusinessException e) {
+            assertEquals(400, e.getCode()); // PARAM_ERROR
+        }
+    }
+
+    @Test
+    public void testOnboarding_CacheHit() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("userId", "700");
+        req.put("difficultyLevel", "novice");
+
+        User user = new User();
+        user.setId(700L);
+
+        // Cache hit
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn("{\"id\":700,\"phone\":\"13700000000\"}");
+
+        // Execute
+        Map<String, Object> result = userService.onboarding(req);
+
+        // Verify - novice 难度评分容差为 20
+        assertEquals(20, result.get("scoringTolerance"));
+        verify(userMapper, times(0)).selectById(anyString()); // 缓存命中，不查数据库
+    }
+
+    @Test
+    public void testOnboarding_CacheParseFailure_FallbackToDb() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("userId", "800");
+        req.put("difficultyLevel", "skilled");
+
+        User user = new User();
+        user.setId(800L);
+
+        // Cache hit but parse failure
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn("invalid json data");
+        when(userMapper.selectById("800")).thenReturn(user);
+
+        // Execute
+        Map<String, Object> result = userService.onboarding(req);
+
+        // Verify - 回退到数据库查询
+        assertNotNull(result);
+        verify(userMapper).selectById("800");
+    }
+
+    @Test
+    public void testOnboarding_UserIdNull_ThrowsException() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("difficultyLevel", "expert");
+        // userId 缺失
+
+        try {
+            userService.onboarding(req);
+        } catch (com.example.fitness.common.exception.BusinessException e) {
+            assertEquals(1002, e.getCode()); // USER_ID_REQUIRED
+        }
+    }
+
+    @Test
+    public void testOnboarding_UserNotFound_ThrowsException() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("userId", "999");
+        req.put("difficultyLevel", "expert");
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn(null);
+        when(userMapper.selectById("999")).thenReturn(null);
+
+        try {
+            userService.onboarding(req);
+        } catch (com.example.fitness.common.exception.BusinessException e) {
+            assertEquals(1001, e.getCode()); // USER_NOT_FOUND
+        }
+    }
+
+    @Test
+    public void testOnboarding_DefaultDifficultyLevel() {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("userId", "600");
+        // difficultyLevel 缺失，默认为 novice
+
+        User user = new User();
+        user.setId(600L);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn(null);
+        when(userMapper.selectById("600")).thenReturn(user);
+
+        Map<String, Object> result = userService.onboarding(req);
+
+        assertNotNull(result);
+        assertEquals(20, result.get("scoringTolerance")); // 默认 novice -> 20
+    }
+
+    @Test
+    public void testLoginByWechat_ExistingUser() throws Exception {
+        LoginRequest req = new LoginRequest();
+        req.setCode("wx-code-existing");
+
+        WxMaJscode2SessionResult session = new WxMaJscode2SessionResult();
+        session.setOpenid("existing-openid");
+
+        User existingUser = new User();
+        existingUser.setId(900L);
+        existingUser.setOpenId("existing-openid");
+        existingUser.setNickname("WechatUser");
+
+        when(wxMaService.getUserService()).thenReturn(wxMaUserService);
+        when(wxMaUserService.getSessionInfo("wx-code-existing")).thenReturn(session);
+        when(userMapper.selectOne(any())).thenReturn(existingUser);
+        when(jwtUtil.generateToken("900")).thenReturn("wx-existing-token");
+
+        UserDTO result = userService.loginByWechat(req);
+
+        assertEquals("900", result.getId());
+        assertEquals("wx-existing-token", result.getToken());
+        verify(userMapper, times(0)).insert(any(User.class)); // 已存在用户，不插入
+    }
+
+    @Test
+    public void testLoginByPhone_NonDuplicateException_Rethrows() {
+        LoginRequest req = new LoginRequest();
+        req.setPhone("13800001111");
+
+        when(userMapper.selectOne(any())).thenReturn(null);
+        when(userMapper.insert(any(User.class))).thenThrow(
+                new RuntimeException("Some other database error"));
+
+        try {
+            userService.loginByPhone(req);
+        } catch (RuntimeException e) {
+            assertEquals("Some other database error", e.getMessage());
+        }
+    }
+
+    @Test
+    public void testLoginByPhone_ConcurrentRegistration_SecondQueryFails() {
+        LoginRequest req = new LoginRequest();
+        req.setPhone("13800002222");
+
+        when(userMapper.selectOne(any())).thenReturn(null) // First check
+                .thenReturn(null); // Second check also returns null
+
+        when(userMapper.insert(any(User.class))).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException(
+                        "Duplicate entry '13800002222' for key 'user.phone'"));
+
+        try {
+            userService.loginByPhone(req);
+        } catch (com.example.fitness.common.exception.BusinessException e) {
+            assertEquals(500, e.getCode()); // INTERNAL_SERVER_ERROR
+        }
+    }
 }
