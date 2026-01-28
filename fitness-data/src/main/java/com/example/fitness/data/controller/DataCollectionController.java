@@ -3,6 +3,10 @@ package com.example.fitness.data.controller;
 import com.example.fitness.common.exception.BusinessException;
 import com.example.fitness.common.result.ErrorCode;
 import com.example.fitness.common.result.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -20,15 +24,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/data")
 @RequiredArgsConstructor
+@Tag(name = "数据采集模块", description = "前端埋点和训练数据收集")
 public class DataCollectionController {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private static final String TOPIC = "frontend_event_stream";
 
-    /**
-     * 批量数据收集接口
-     * 
-     * @param request 包含会话ID和事件列表数据
-     */
     private final org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory<?, ?> circuitBreakerFactory;
 
     /**
@@ -36,6 +36,12 @@ public class DataCollectionController {
      * 
      * @param request 包含会话ID和事件列表数据
      */
+    @Operation(summary = "批量采集上传", description = "批量上传训练数据，包括评分记录、心率等指标")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "操作成功"),
+            @ApiResponse(responseCode = "400", description = "参数校验失败"),
+            @ApiResponse(responseCode = "401", description = "未认证")
+    })
     @PostMapping("/collect")
     public Result<Void> collect(@RequestBody Map<String, Object> request) {
         if (request == null || request.isEmpty()) {
