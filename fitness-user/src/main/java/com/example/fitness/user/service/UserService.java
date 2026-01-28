@@ -27,5 +27,18 @@ public interface UserService {
     /**
      * 更新用户统计信息
      */
+    /**
+     * 更新用户统计信息
+     */
     void updateUserStats(Map<String, Object> request);
+
+    /**
+     * 获取用户个人资料
+     */
+    UserDTO getUserProfile(Long userId);
+
+    /**
+     * 获取用户统计数据 (API 3.5.1)
+     */
+    Map<String, Object> getUserStats(Long userId);
 }

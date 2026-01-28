@@ -215,6 +215,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         log.info("正在更新用户统计信息: {}", request);
     }
 
+    @Override
+    public UserDTO getUserProfile(Long userId) {
+        User user = getUserForProfile(String.valueOf(userId));
+        return convertToDTO(user, null); // 不返回 Token
+    }
+
+    @Override
+    public Map<String, Object> getUserStats(Long userId) {
+        User user = getUserForProfile(String.valueOf(userId));
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalDuration", user.getTotalDuration() != null ? user.getTotalDuration() : 0);
+        stats.put("totalScore", user.getTotalScore() != null ? user.getTotalScore() : 0);
+
+        // Mock 模拟数据 (Demo 阶段)
+        stats.put("weeklyDuration", 120);
+        stats.put("totalCalories", user.getTotalScore() != null ? user.getTotalScore() * 10 : 0); // 简单估算
+        stats.put("completionRate", 85);
+        stats.put("history", java.util.Collections.emptyList());
+
+        return stats;
+    }
+
     private UserDTO convertToDTO(User user, String token) {
         return UserDTO.builder()
                 .id(String.valueOf(user.getId()))

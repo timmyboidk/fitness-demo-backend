@@ -2,7 +2,7 @@ package com.example.fitness.common.util;
 
 import com.example.fitness.common.config.FitnessProperties;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
+
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
 import org.junit.jupiter.api.BeforeEach;

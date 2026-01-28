@@ -1,6 +1,5 @@
 package com.example.fitness.data.consumer;
 
-import com.example.fitness.api.dto.ScoringResultEvent;
 import com.example.fitness.data.mapper.UserStatsMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

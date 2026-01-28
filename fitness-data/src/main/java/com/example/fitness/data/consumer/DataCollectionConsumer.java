@@ -26,7 +26,15 @@ public class DataCollectionConsumer {
         try {
             // 1. 解析消息
             String json;
-            if (message instanceof String) {
+            if (message instanceof org.apache.kafka.clients.consumer.ConsumerRecord) {
+                org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record = (org.apache.kafka.clients.consumer.ConsumerRecord<?, ?>) message;
+                Object value = record.value();
+                if (value instanceof String) {
+                    json = (String) value;
+                } else {
+                    json = objectMapper.writeValueAsString(value);
+                }
+            } else if (message instanceof String) {
                 json = (String) message;
             } else {
                 json = objectMapper.writeValueAsString(message);

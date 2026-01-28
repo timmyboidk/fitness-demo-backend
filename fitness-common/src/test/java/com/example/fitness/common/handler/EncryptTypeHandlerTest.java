@@ -69,13 +69,7 @@ class EncryptTypeHandlerTest {
     @Test
     @DisplayName("getNullableResult (columnName) - 解密有效密文")
     void getNullableResult_ByColumnName_DecryptsValid() throws SQLException {
-        // 先获取一个有效的密文
-        String plainText = "test_phone_123";
-        EncryptTypeHandler.setKey("1234567890123456");
-        EncryptTypeHandler tempHandler = new EncryptTypeHandler();
-
-        // 通过 mock 获取解密结果
-        // 由于我们无法直接获取加密结果，使用较简单的策略：验证解密失败时返回原值
+        // 验证解密失败时返回原值
         when(resultSet.getString("phone")).thenReturn("invalid_base64_not_encrypted");
 
         String result = handler.getNullableResult(resultSet, "phone");

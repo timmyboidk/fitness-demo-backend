@@ -41,7 +41,8 @@ public class PaymentController {
         String receipt = (String) request.get("receipt");
         String platform = (String) request.get("platform");
 
-        log.info("验证支付凭证: userId={}, planId={}, platform={}", userId, planId, platform);
+        log.info("验证支付凭证: userId={}, planId={}, platform={}, receiptLength={}",
+                userId, planId, platform, receipt != null ? receipt.length() : 0);
 
         // TODO: 实际生产环境应调用 Apple/Google 服务器验证收据
         // 1. 验证收据有效性
