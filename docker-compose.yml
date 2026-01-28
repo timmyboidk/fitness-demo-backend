@@ -37,7 +37,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   mysql:
-    image: mysql:8.0
+    image: mysql:8.3.0
     ports:
       - "3306:3306"
     environment:

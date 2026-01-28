@@ -28,8 +28,11 @@
 	<properties>
 		<java.version>21</java.version>
 		<mybatis-plus.version>3.5.9</mybatis-plus.version>
-		<lombok.version>1.18.30</lombok.version>
 		<wx-java.version>4.6.0</wx-java.version>
+		<hutool.version>5.8.25</hutool.version>
+		<jjwt.version>0.11.5</jjwt.version>
+		<spring-cloud.version>2023.0.3</spring-cloud.version>
+		<springdoc.version>2.8.5</springdoc.version>
 	</properties>
 
 	<dependencyManagement>
@@ -44,29 +47,38 @@
 				<artifactId>wx-java-miniapp-spring-boot-starter</artifactId>
 				<version>${wx-java.version}</version>
 			</dependency>
-			<!-- JWT -->
+			<dependency>
+				<groupId>cn.hutool</groupId>
+				<artifactId>hutool-all</artifactId>
+				<version>${hutool.version}</version>
+			</dependency>
 			<dependency>
 				<groupId>io.jsonwebtoken</groupId>
 				<artifactId>jjwt-api</artifactId>
-				<version>0.11.5</version>
+				<version>${jjwt.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>io.jsonwebtoken</groupId>
 				<artifactId>jjwt-impl</artifactId>
-				<version>0.11.5</version>
+				<version>${jjwt.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>io.jsonwebtoken</groupId>
 				<artifactId>jjwt-jackson</artifactId>
-				<version>0.11.5</version>
+				<version>${jjwt.version}</version>
 			</dependency>
-			<!-- OpenAPI / Swagger -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
 			<dependency>
-				<groupId>org.springdoc</groupId>
-				<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-				<version>2.8.15</version>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
 			</dependency>
-			<!-- Flyway -->
 		</dependencies>
 	</dependencyManagement>
 
@@ -74,6 +86,7 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -110,6 +123,26 @@
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<version>3.4.1</version>
+				<executions>
+					<execution>
+						<id>enforce-java</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireJavaVersion>
+									<version>21</version>
+								</requireJavaVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
