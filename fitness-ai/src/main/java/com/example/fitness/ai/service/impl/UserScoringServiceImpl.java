@@ -12,6 +12,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -19,125 +20,205 @@ import java.util.Objects;
 
 /**
  * 用户运动评分服务实现类
- * 模拟 AI 评分算法生成分数，并将评分事件异步发送至消息队列。
+ * 
+ * <p>
+ * 基于余弦相似度算法对用户动作进行评分，
+ * 并将评分结果异步发送至 Kafka 消息队列。
+ * 
+ * <p>
+ * 评分流程：
+ * <ol>
+ * <li>获取标准动作模板向量</li>
+ * <li>解析用户上传的关键点数据</li>
+ * <li>计算余弦相似度并转换为 0-100 分数</li>
+ * <li>生成反馈建议</li>
+ * <li>异步发送评分事件到 Kafka</li>
+ * </ol>
+ * 
+ * @author fitness-team
+ * @since 1.0.0
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserScoringServiceImpl implements ScoringService {
+
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    /** Kafka 主题名称 */
     private static final String TOPIC = "frontend_event_stream";
 
+    /** 标准动作模板向量长度（17 个关键点 × 2 坐标） */
+    private static final int VECTOR_LENGTH = 34;
+
+    /** 最大关键点数量 */
+    private static final int MAX_KEYPOINTS = 17;
+
+    // ==================== 标准动作模板缓存 ====================
+
+    private static final Map<String, double[]> STANDARD_TEMPLATE_CACHE;
+
+    static {
+        double[] defaultVector = new double[VECTOR_LENGTH];
+        java.util.Arrays.fill(defaultVector, 0.5);
+        STANDARD_TEMPLATE_CACHE = Map.of("m_squat", defaultVector);
+    }
+
+    // ==================== 核心评分方法 ====================
+
     /**
-     * 计算评分逻辑：基于余弦相似度的关键点比对
+     * 计算用户动作评分
      */
     @Override
     @SuppressWarnings("unchecked")
     public ScoringResponse calculateScore(ScoringRequest request) {
-        if (request.getMoveId() == null || request.getMoveId().isEmpty()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
-        }
+        // 1. 参数校验
+        validateRequest(request);
 
-        // 1. 获取动作的标准模板数据 (模拟数据，实际应查库)
+        // 2. 获取标准模板
         double[] standardVector = getStandardTemplate(request.getMoveId());
-        if (standardVector == null) {
-            throw new BusinessException(ErrorCode.MODEL_NOT_FOUND);
-        }
 
-        // 2. 解析用户上传的关键点数据
+        // 3. 解析用户关键点
         Map<String, Object> data = request.getData();
-        if (data == null || !data.containsKey("keypoints")) {
-            return ScoringResponse.builder().success(false).score(0).feedback(java.util.List.of("未检测到关键点数据")).build();
+        if (!hasKeypoints(data)) {
+            return buildErrorResponse("未检测到关键点数据");
         }
 
+        // 4. 计算评分
         List<Map<String, Object>> keypoints = (List<Map<String, Object>>) data.get("keypoints");
-        double[] userVector = normalizeKeypoints(keypoints);
+        int score = computeScore(standardVector, keypoints);
 
-        // 3. 计算余弦相似度并转换为 0-100 分数
-        double similarity = calculateCosineSimilarity(standardVector, userVector);
-        int score = Math.max(0, Math.min(100, (int) (similarity * 100)));
+        // 5. 构建响应
+        ScoringResponse response = buildSuccessResponse(score);
 
-        // 4. 根据难度调整容差 (简单难度下分数略微上浮)
-        // String difficulty = ... (可从 User 上下文获取，此处暂略)
-        // if ("novice".equals(difficulty)) score = Math.min(100, score + 10);
-
-        ScoringResponse response = ScoringResponse.builder()
-                .success(true)
-                .score(score)
-                .feedback(generateFeedback(score))
-                .build();
-
-        // 5. 异步发送到 Kafka
-        try {
-            String userId = (String) data.getOrDefault("userId", "unknown");
-            ScoringResultEvent event = ScoringResultEvent
-                    .builder()
-                    .userId(userId)
-                    .moveId(request.getMoveId())
-                    .score(score)
-                    .timestamp(LocalDateTime.now())
-                    .extraData(Collections.singletonMap("duration", 5)) // 模拟时长
-                    .build();
-
-            kafkaTemplate.send(TOPIC, Objects.requireNonNull(request.getMoveId()), event);
-            log.info("已将评分事件发送至 Kafka, 动作 ID: {}, 分数: {}", request.getMoveId(), score);
-        } catch (Exception e) {
-            log.error("发送 Kafka 失败: {}", e.getMessage());
-            // 非核心路径不中断
-        }
+        // 6. 异步发送事件
+        sendScoringEvent(request, data, score);
 
         return response;
     }
 
-    // 缓存标准动作模板，避免重复创建对象
-    private static final Map<String, double[]> STANDARD_TEMPLATE_CACHE;
+    // ==================== 私有辅助方法：参数校验 ====================
 
-    static {
-        double[] defaultVector = new double[34];
-        java.util.Arrays.fill(defaultVector, 0.5);
-
-        // 预加载模板 (实际项目应从数据库或 OSS 加载缓存)
-        STANDARD_TEMPLATE_CACHE = Map.of(
-                "m_squat", defaultVector
-        // 可添加更多动作
-        );
-    }
-
-    private double[] getStandardTemplate(String moveId) {
-        return STANDARD_TEMPLATE_CACHE.getOrDefault(moveId, STANDARD_TEMPLATE_CACHE.values().iterator().next());
-    }
-
-    private double[] normalizeKeypoints(List<Map<String, Object>> keypoints) {
-        // 将关键点列表扁平化为向量 [x1, y1, x2, y2, ...]
-        // 实际需做归一化处理（以髋部为原点，缩放尺度的）
-        // 这里简化为直接提取
-        double[] vector = new double[34];
-        for (int i = 0; i < Math.min(keypoints.size(), 17); i++) {
-            Map<String, Object> kp = keypoints.get(i);
-            vector[i * 2] = Double.parseDouble(String.valueOf(kp.getOrDefault("x", 0)));
-            vector[i * 2 + 1] = Double.parseDouble(String.valueOf(kp.getOrDefault("y", 0)));
+    /**
+     * 校验评分请求参数
+     */
+    private void validateRequest(ScoringRequest request) {
+        if (request.getMoveId() == null || request.getMoveId().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
         }
+    }
+
+    /**
+     * 检查是否包含关键点数据
+     */
+    private boolean hasKeypoints(Map<String, Object> data) {
+        return data != null && data.containsKey("keypoints");
+    }
+
+    // ==================== 私有辅助方法：评分计算 ====================
+
+    /**
+     * 计算最终评分
+     */
+    private int computeScore(double[] standardVector, List<Map<String, Object>> keypoints) {
+        double[] userVector = normalizeKeypoints(keypoints);
+        double similarity = calculateCosineSimilarity(standardVector, userVector);
+        return Math.max(0, Math.min(100, (int) (similarity * 100)));
+    }
+
+    /**
+     * 获取标准动作模板向量
+     */
+    private double[] getStandardTemplate(String moveId) {
+        double[] template = STANDARD_TEMPLATE_CACHE.get(moveId);
+        if (template != null) {
+            return template;
+        }
+        // 返回默认模板
+        return STANDARD_TEMPLATE_CACHE.values().iterator().next();
+    }
+
+    /**
+     * 将关键点列表归一化为向量
+     * <p>
+     * 格式：[x1, y1, x2, y2, ...]
+     */
+    private double[] normalizeKeypoints(List<Map<String, Object>> keypoints) {
+        double[] vector = new double[VECTOR_LENGTH];
+        int count = Math.min(keypoints.size(), MAX_KEYPOINTS);
+
+        for (int i = 0; i < count; i++) {
+            Map<String, Object> kp = keypoints.get(i);
+            vector[i * 2] = parseCoordinate(kp, "x");
+            vector[i * 2 + 1] = parseCoordinate(kp, "y");
+        }
+
         return vector;
     }
 
+    /**
+     * 解析坐标值
+     */
+    private double parseCoordinate(Map<String, Object> keypoint, String key) {
+        Object value = keypoint.getOrDefault(key, 0);
+        return Double.parseDouble(String.valueOf(value));
+    }
+
+    /**
+     * 计算两个向量的余弦相似度
+     */
     private double calculateCosineSimilarity(double[] v1, double[] v2) {
-        if (v1.length != v2.length)
+        if (v1.length != v2.length) {
             return 0.0;
+        }
+
         double dotProduct = 0.0;
         double normA = 0.0;
         double normB = 0.0;
+
         for (int i = 0; i < v1.length; i++) {
             dotProduct += v1[i] * v2[i];
-            normA += Math.pow(v1[i], 2);
-            normB += Math.pow(v2[i], 2);
+            normA += v1[i] * v1[i];
+            normB += v2[i] * v2[i];
         }
-        if (normA == 0 || normB == 0)
+
+        if (normA == 0 || normB == 0) {
             return 0.0;
+        }
+
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-    private java.util.List<Object> generateFeedback(int score) {
-        java.util.List<Object> feedback = new java.util.ArrayList<>();
+    // ==================== 私有辅助方法：响应构建 ====================
+
+    /**
+     * 构建成功响应
+     */
+    private ScoringResponse buildSuccessResponse(int score) {
+        return ScoringResponse.builder()
+                .success(true)
+                .score(score)
+                .feedback(generateFeedback(score))
+                .build();
+    }
+
+    /**
+     * 构建错误响应
+     */
+    private ScoringResponse buildErrorResponse(String message) {
+        return ScoringResponse.builder()
+                .success(false)
+                .score(0)
+                .feedback(List.of(message))
+                .build();
+    }
+
+    /**
+     * 根据分数生成反馈建议
+     */
+    private List<Object> generateFeedback(int score) {
+        List<Object> feedback = new ArrayList<>();
+
         if (score < 60) {
             feedback.add("动作幅度不够，请尝试下蹲更深一点");
         } else if (score < 80) {
@@ -145,6 +226,38 @@ public class UserScoringServiceImpl implements ScoringService {
         } else {
             feedback.add("完美！保持这个节奏");
         }
+
         return feedback;
+    }
+
+    // ==================== 私有辅助方法：事件发送 ====================
+
+    /**
+     * 异步发送评分事件到 Kafka
+     */
+    private void sendScoringEvent(ScoringRequest request, Map<String, Object> data, int score) {
+        try {
+            ScoringResultEvent event = buildScoringEvent(request, data, score);
+            kafkaTemplate.send(TOPIC, Objects.requireNonNull(request.getMoveId()), event);
+            log.info("已将评分事件发送至 Kafka, 动作 ID: {}, 分数: {}", request.getMoveId(), score);
+        } catch (Exception e) {
+            // 非核心路径，仅记录日志
+            log.error("发送 Kafka 失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 构建评分事件对象
+     */
+    private ScoringResultEvent buildScoringEvent(ScoringRequest request, Map<String, Object> data, int score) {
+        String userId = (String) data.getOrDefault("userId", "unknown");
+
+        return ScoringResultEvent.builder()
+                .userId(userId)
+                .moveId(request.getMoveId())
+                .score(score)
+                .timestamp(LocalDateTime.now())
+                .extraData(Collections.singletonMap("duration", 5))
+                .build();
     }
 }

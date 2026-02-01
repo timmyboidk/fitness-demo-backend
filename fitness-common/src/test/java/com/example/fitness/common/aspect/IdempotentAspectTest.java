@@ -30,6 +30,7 @@ import org.mockito.quality.Strictness;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("IdempotentAspect 单元测试")
+@SuppressWarnings("null") // Suppress Mockito argument matcher null safety warnings
 class IdempotentAspectTest {
 
     @Mock

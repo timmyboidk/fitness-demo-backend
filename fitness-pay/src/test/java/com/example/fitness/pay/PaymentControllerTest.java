@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(PaymentController.class)
 @DisplayName("支付控制器测试")
+@SuppressWarnings("null") // Suppress null type safety warnings from MockMvc and Hamcrest matchers
 class PaymentControllerTest {
 
     @Autowired

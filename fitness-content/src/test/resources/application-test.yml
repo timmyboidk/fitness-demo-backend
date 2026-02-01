@@ -1,13 +1,24 @@
 spring:
+  # 使用 H2 进行集成测试（不需要 Docker）
   datasource:
-    url: jdbc:tc:mysql:8.0:///fitness_content
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    url: jdbc:h2:mem:fitness_content;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
   sql:
     init:
       mode: always
-  kafka:
-    bootstrap-servers: localhost:9092
-  data:
-    redis:
-      host: localhost
-      port: 6379
+      schema-locations: classpath:schema.sql
+  h2:
+    console:
+      enabled: false
+  # 禁用自动配置（fitness-content 模块不使用 Kafka/Redis）
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true

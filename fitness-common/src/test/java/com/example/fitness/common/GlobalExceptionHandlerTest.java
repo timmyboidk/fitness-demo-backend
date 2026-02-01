@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * </ul>
  */
 @DisplayName("GlobalExceptionHandler 单元测试")
+@SuppressWarnings("null") // Suppress null type safety warnings from MethodParameter usage
 class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();

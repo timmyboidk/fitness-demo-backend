@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(SocialController.class)
 @DisplayName("社交控制器测试")
+@SuppressWarnings("null") // Suppress null type safety warnings from Hamcrest matchers
 class SocialControllerTest {
 
     @Autowired

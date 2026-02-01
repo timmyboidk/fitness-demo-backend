@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("RateLimitAspect 单元测试")
+@SuppressWarnings("null") // Suppress Mockito argument matcher null safety warnings
 class RateLimitAspectTest {
 
     @Mock

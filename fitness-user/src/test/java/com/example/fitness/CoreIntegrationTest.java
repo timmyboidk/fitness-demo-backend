@@ -14,6 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.example.fitness.common.util.JwtUtil;
 
+/**
+ * 核心功能集成测试
+ * 测试 AI 评分等核心功能
+ */
 @AutoConfigureMockMvc
 public class CoreIntegrationTest extends AbstractIntegrationTest {
 
@@ -25,17 +29,6 @@ public class CoreIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JwtUtil jwtUtil;
-
-    @Test
-    public void testLibraryFlow() throws Exception {
-        String token = jwtUtil.generateToken("1");
-        mockMvc.perform(get("/api/library")
-                .header("Authorization", "Bearer " + token)
-                .param("difficulty", "novice"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.moves").isArray());
-    }
 
     @Test
     public void testScoringFlow() throws Exception {

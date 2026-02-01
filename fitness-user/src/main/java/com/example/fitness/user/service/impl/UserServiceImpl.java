@@ -26,11 +26,17 @@ import me.chanjar.weixin.common.error.WxErrorException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 用户服务实现类
+ * 
+ * <p>
  * 提供用户登录、首次使用落地流程管理和统计数据更新等功能。
  * 使用了 Redis 缓存方案降低数据库负载。
+ * 
+ * @author fitness-team
+ * @since 1.0.0
  */
 @Slf4j
 @Service
@@ -43,169 +49,78 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final JwtUtil jwtUtil;
     private final WxMaService wxMaService;
 
+    /** 用户缓存键前缀 */
     private static final String USER_CACHE_KEY_PREFIX = "user:profile:";
-    private static final long USER_CACHE_TTL = 3600; // 1小时缓存
+
+    /** 缓存过期时间：1 小时 */
+    private static final long USER_CACHE_TTL = 3600;
+
+    // ==================== 登录相关方法 ====================
 
     /**
-     * 手机号登录：如果用户不存在则自动创建
+     * 手机号登录
+     * <p>
+     * 如果用户不存在则自动创建新用户
      */
     @Override
     @RateLimit(count = 5, time = 1, limitType = RateLimit.LimitType.IP)
     public UserDTO loginByPhone(LoginRequest request) {
-        // 1. 校验验证码 (开发环境跳过，生产环境应比对 Redis)
-        // String cachedCode = redisTemplate.opsForValue().get("sms:code:" +
-        // request.getPhone());
-        // if (!request.getCode().equals(cachedCode)) throw new
-        // BusinessException(ErrorCode.PARAM_ERROR, "验证码错误");
-
-        // 2. 查询或注册用户
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, request.getPhone()));
-        if (user == null) {
-            user = new User();
-            user.setPhone(request.getPhone());
-            user.setNickname("User_" + request.getPhone().substring(7));
-            user.setCreatedAt(LocalDateTime.now());
-            user.setUpdatedAt(LocalDateTime.now());
-            try {
-                userMapper.insert(user);
-            } catch (Exception e) {
-                // 并发注册处理：虽然 user == null，但 insert 时遇到 duplicate key
-                // 检查是否为唯一键冲突
-                if (e.getMessage().contains("Duplicate entry")
-                        || (e.getCause() != null && e.getCause().getMessage().contains("Duplicate entry"))) {
-                    // 重新查询用户并返回
-                    User existingUser = userMapper
-                            .selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, request.getPhone()));
-                    if (existingUser != null) {
-                        user = existingUser;
-                    } else {
-                        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "注册失败，请稍后重试");
-                    }
-                } else {
-                    if (e instanceof RuntimeException) {
-                        throw (RuntimeException) e;
-                    } else {
-                        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, e.getMessage());
-                    }
-                }
-            }
-        }
-
-        // 3. 生成真实 JWT Token
+        User user = findOrCreateUserByPhone(request.getPhone());
         String token = jwtUtil.generateToken(String.valueOf(user.getId()));
-
-        // 4. 封装返回
         return convertToDTO(user, token);
     }
 
     /**
      * 微信登录
+     * <p>
+     * 通过微信授权码获取 openId，若用户不存在则自动创建
      */
     @Override
     @RateLimit(count = 5, time = 1, limitType = RateLimit.LimitType.IP)
     public UserDTO loginByWechat(LoginRequest request) {
-        String openId;
-        try {
-            // 1. 调用微信接口获取 openId
-            WxMaJscode2SessionResult session = wxMaService.getUserService().getSessionInfo(request.getCode());
-            openId = session.getOpenid();
-        } catch (WxErrorException e) {
-            log.error("微信登录失败: {}", e.getMessage());
-            throw new BusinessException(ErrorCode.LOGIN_FAILED, "微信授权失败");
-        }
-
-        // 2. 查询或注册用户
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getOpenId, openId));
-        if (user == null) {
-            user = new User();
-            user.setOpenId(openId);
-            user.setNickname("Wechat User");
-            user.setCreatedAt(LocalDateTime.now());
-            user.setUpdatedAt(LocalDateTime.now());
-            userMapper.insert(user);
-        }
-
-        // 3. 生成真实 Token
+        String openId = getWechatOpenId(request.getCode());
+        User user = findOrCreateUserByOpenId(openId);
         String token = jwtUtil.generateToken(String.valueOf(user.getId()));
-
         return convertToDTO(user, token);
     }
 
+    // ==================== 用户引导流程 ====================
+
     /**
-     * 首次使用落地逻辑：设置难度等级，并返回对应的评分配置
+     * 首次使用落地逻辑
+     * <p>
+     * 设置用户难度等级，并返回对应的评分配置
      */
     @Override
     @Idempotent(expire = 5)
     public Map<String, Object> onboarding(Map<String, Object> request) {
-        String userId = (String) request.get("userId");
-        if (userId == null) {
-            throw new BusinessException(ErrorCode.USER_ID_REQUIRED);
-        }
+        String userId = extractUserId(request);
         String level = (String) request.getOrDefault("difficultyLevel", "novice");
 
-        // 1. 尝试从缓存读取
         User user = getUserForProfile(userId);
-
         user.setDifficultyLevel(level);
         userMapper.updateById(user);
 
-        // 2. 更新后清除缓存，保证数据一致性（Cache Pattern: Cache-Aside - Invalidate on Update）
-        // 也可以选择更新缓存，但失效缓存通常更简单且并发问题更少
-        String cacheKey = USER_CACHE_KEY_PREFIX + userId;
-        redisTemplate.delete(cacheKey);
+        // 清除缓存保证数据一致性（Cache-Aside 模式）
+        invalidateUserCache(userId);
 
-        Map<String, Object> config = new HashMap<>();
-        // expert 难度下的评分容差更小
-        config.put("scoringTolerance", "expert".equals(level) ? 5 : 20);
-        config.put("recommendedPlan", "plan_starter");
-        return config;
+        return buildOnboardingConfig(level);
     }
 
-    /**
-     * 内部私有方法：带缓存查询用户信息
-     * Cache-Aside 模式：
-     * 1. 查缓存，命中则返回
-     * 2. 未命中查 DB
-     * 3. 回写缓存并返回
-     */
-    private User getUserForProfile(String userId) {
-        String cacheKey = USER_CACHE_KEY_PREFIX + userId;
+    // ==================== 用户信息查询 ====================
 
-        // 1. 查缓存
-        String cachedValue = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedValue != null && !cachedValue.isEmpty()) {
-            try {
-                // 缓存命中 (Cache Hit)
-                log.debug("用户缓存命中: userId={}", userId);
-                return objectMapper.readValue(cachedValue, User.class);
-            } catch (JsonProcessingException e) {
-                log.warn("用户缓存解析失败，将回退数据库查询: userId={}, error={}", userId, e.getMessage());
-                // 解析失败视为未命中，继续查库覆盖脏数据
-            }
-        }
-
-        // 2. 查数据库 (Cache Miss)
-        log.debug("用户缓存未命中，查询数据库: userId={}", userId);
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        }
-
-        // 3. 回写缓存 (Write Back to Cache)
-        try {
-            String jsonValue = objectMapper.writeValueAsString(user);
-            redisTemplate.opsForValue().set(cacheKey, jsonValue, USER_CACHE_TTL, TimeUnit.SECONDS);
-        } catch (JsonProcessingException e) {
-            log.error("用户数据序列化写入缓存失败: userId={}, error={}", userId, e.getMessage());
-            // 写入缓存失败不影响主业务逻辑，仅记录日志
-        }
-
-        return user;
+    @Override
+    public UserDTO getUserProfile(Long userId) {
+        User user = getUserForProfile(String.valueOf(userId));
+        return convertToDTO(user, null);
     }
 
-    /**
-     * 更新用户统计：实际场景中可能同步到 user_stats 表或 Apache Doris
-     */
+    @Override
+    public Map<String, Object> getUserStats(Long userId) {
+        User user = getUserForProfile(String.valueOf(userId));
+        return buildUserStats(user);
+    }
+
     @Override
     @Idempotent(expire = 3)
     public void updateUserStats(Map<String, Object> request) {
@@ -215,28 +130,200 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         log.info("正在更新用户统计信息: {}", request);
     }
 
-    @Override
-    public UserDTO getUserProfile(Long userId) {
-        User user = getUserForProfile(String.valueOf(userId));
-        return convertToDTO(user, null); // 不返回 Token
+    // ==================== 私有辅助方法：用户查询与创建 ====================
+
+    /**
+     * 根据手机号查找或创建用户
+     */
+    private User findOrCreateUserByPhone(String phone) {
+        User existingUser = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
+
+        if (existingUser != null) {
+            return existingUser;
+        }
+
+        return createNewPhoneUser(phone);
     }
 
-    @Override
-    public Map<String, Object> getUserStats(Long userId) {
-        User user = getUserForProfile(String.valueOf(userId));
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalDuration", user.getTotalDuration() != null ? user.getTotalDuration() : 0);
-        stats.put("totalScore", user.getTotalScore() != null ? user.getTotalScore() : 0);
+    /**
+     * 创建新的手机号用户（处理并发注册）
+     */
+    private User createNewPhoneUser(String phone) {
+        User user = buildNewUser(phone, "User_" + phone.substring(7));
 
-        // Mock 模拟数据 (Demo 阶段)
+        try {
+            userMapper.insert(user);
+            return user;
+        } catch (Exception e) {
+            return handleDuplicateRegistration(phone, e);
+        }
+    }
+
+    /**
+     * 处理并发注册导致的重复键异常
+     */
+    private User handleDuplicateRegistration(String phone, Exception e) {
+        if (!isDuplicateKeyException(e)) {
+            throw wrapException(e);
+        }
+
+        // 并发注册：重新查询已存在的用户
+        User existingUser = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
+
+        if (existingUser != null) {
+            return existingUser;
+        }
+
+        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "注册失败，请稍后重试");
+    }
+
+    /**
+     * 根据 openId 查找或创建微信用户
+     */
+    private User findOrCreateUserByOpenId(String openId) {
+        User existingUser = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getOpenId, openId));
+
+        if (existingUser != null) {
+            return existingUser;
+        }
+
+        User user = new User();
+        user.setOpenId(openId);
+        user.setNickname("Wechat User");
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.insert(user);
+
+        return user;
+    }
+
+    /**
+     * 获取微信 openId
+     */
+    private String getWechatOpenId(String code) {
+        try {
+            WxMaJscode2SessionResult session = wxMaService.getUserService().getSessionInfo(code);
+            return session.getOpenid();
+        } catch (WxErrorException e) {
+            log.error("微信登录失败: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.LOGIN_FAILED, "微信授权失败");
+        }
+    }
+
+    // ==================== 私有辅助方法：缓存操作 ====================
+
+    /**
+     * 带缓存查询用户信息（Cache-Aside 模式）
+     */
+    private User getUserForProfile(String userId) {
+        String cacheKey = USER_CACHE_KEY_PREFIX + userId;
+
+        // 1. 尝试从缓存读取
+        Optional<User> cachedUser = readFromCache(cacheKey);
+        if (cachedUser.isPresent()) {
+            log.debug("用户缓存命中: userId={}", userId);
+            return cachedUser.get();
+        }
+
+        // 2. 缓存未命中，查询数据库
+        log.debug("用户缓存未命中，查询数据库: userId={}", userId);
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 3. 回写缓存
+        writeToCache(cacheKey, user);
+
+        return user;
+    }
+
+    /**
+     * 从缓存读取用户
+     */
+    private Optional<User> readFromCache(String cacheKey) {
+        String cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedValue == null || cachedValue.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(objectMapper.readValue(cachedValue, User.class));
+        } catch (JsonProcessingException e) {
+            log.warn("用户缓存解析失败: cacheKey={}, error={}", cacheKey, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 写入用户缓存
+     */
+    private void writeToCache(String cacheKey, User user) {
+        try {
+            String jsonValue = objectMapper.writeValueAsString(user);
+            redisTemplate.opsForValue().set(cacheKey, jsonValue, USER_CACHE_TTL, TimeUnit.SECONDS);
+        } catch (JsonProcessingException e) {
+            log.error("用户数据序列化写入缓存失败: cacheKey={}, error={}", cacheKey, e.getMessage());
+        }
+    }
+
+    /**
+     * 失效用户缓存
+     */
+    private void invalidateUserCache(String userId) {
+        String cacheKey = USER_CACHE_KEY_PREFIX + userId;
+        redisTemplate.delete(cacheKey);
+    }
+
+    // ==================== 私有辅助方法：数据构建 ====================
+
+    /**
+     * 构建新用户对象
+     */
+    private User buildNewUser(String phone, String nickname) {
+        User user = new User();
+        user.setPhone(phone);
+        user.setNickname(nickname);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        return user;
+    }
+
+    /**
+     * 构建引导配置
+     */
+    private Map<String, Object> buildOnboardingConfig(String level) {
+        Map<String, Object> config = new HashMap<>();
+        config.put("scoringTolerance", "expert".equals(level) ? 5 : 20);
+        config.put("recommendedPlan", "plan_starter");
+        return config;
+    }
+
+    /**
+     * 构建用户统计数据
+     */
+    private Map<String, Object> buildUserStats(User user) {
+        Map<String, Object> stats = new HashMap<>();
+
+        int totalDuration = user.getTotalDuration() != null ? user.getTotalDuration() : 0;
+        int totalScore = user.getTotalScore() != null ? user.getTotalScore() : 0;
+
+        stats.put("totalDuration", totalDuration);
+        stats.put("totalScore", totalScore);
         stats.put("weeklyDuration", 120);
-        stats.put("totalCalories", user.getTotalScore() != null ? user.getTotalScore() * 10 : 0); // 简单估算
+        stats.put("totalCalories", totalScore * 10);
         stats.put("completionRate", 85);
         stats.put("history", java.util.Collections.emptyList());
 
         return stats;
     }
 
+    /**
+     * 转换为 DTO
+     */
     private UserDTO convertToDTO(User user, String token) {
         return UserDTO.builder()
                 .id(String.valueOf(user.getId()))
@@ -245,5 +332,41 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .avatar(user.getAvatar())
                 .token(token)
                 .build();
+    }
+
+    // ==================== 私有辅助方法：异常处理 ====================
+
+    /**
+     * 从请求中提取用户 ID
+     */
+    private String extractUserId(Map<String, Object> request) {
+        String userId = (String) request.get("userId");
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.USER_ID_REQUIRED);
+        }
+        return userId;
+    }
+
+    /**
+     * 判断是否为重复键异常
+     */
+    private boolean isDuplicateKeyException(Exception e) {
+        String message = e.getMessage();
+        if (message != null && message.contains("Duplicate entry")) {
+            return true;
+        }
+        return e.getCause() != null &&
+                e.getCause().getMessage() != null &&
+                e.getCause().getMessage().contains("Duplicate entry");
+    }
+
+    /**
+     * 包装异常
+     */
+    private RuntimeException wrapException(Exception e) {
+        if (e instanceof RuntimeException) {
+            return (RuntimeException) e;
+        }
+        return new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, e.getMessage());
     }
 }

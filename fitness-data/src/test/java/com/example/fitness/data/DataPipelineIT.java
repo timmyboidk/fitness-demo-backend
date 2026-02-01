@@ -13,7 +13,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -34,15 +35,18 @@ import static org.awaitility.Awaitility.await;
 @DisplayName("数据处理链路集成测试")
 class DataPipelineIT {
 
-    static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.3.0")
+    @Container
+    static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
             .withDatabaseName("fitness_data_db")
             .withUsername("root")
             .withPassword("root")
             .withInitScript("sql/schema.sql");
 
-    static final KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.4.0"));
+    @Container
+    static final KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("apache/kafka:3.8.0"));
 
-    static final RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7.2-alpine"));
+    @Container
+    static final RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7-alpine"));
 
     @BeforeAll
     static void startContainers() {

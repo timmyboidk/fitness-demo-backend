@@ -1,10 +1,11 @@
 package com.example.fitness;
 
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -12,30 +13,50 @@ import com.redis.testcontainers.RedisContainer;
 
 /**
  * 集成测试基类
- * 启动 MySQL, Redis, Kafka 容器
+ * 启动 MySQL, Redis, Kafka 容器（使用优化的小型镜像）
+ * 注意：需要 Docker 运行环境，Docker 不可用时测试将被跳过
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@EnabledIf("isDockerAvailable")
 public abstract class AbstractIntegrationTest {
 
-    static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.3.0")
-            .withDatabaseName("fitness_db")
-            .withUsername("root")
-            .withPassword("root")
-            .withInitScript("sql/schema.sql");
+    /**
+     * 检查 Docker 是否可用
+     */
+    static boolean isDockerAvailable() {
+        try {
+            DockerClientFactory.instance().client();
+            return true;
+        } catch (Throwable ex) {
+            return false;
+        }
+    }
 
-    static final RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7.2-alpine"));
+    // 使用单例容器，确保所有测试类共享同一组容器
+    private static MySQLContainer<?> mysql;
+    private static RedisContainer redis;
+    private static KafkaContainer kafka;
 
-    static final KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.4.0"));
+    static {
+        // 使用较小的镜像版本
+        mysql = new MySQLContainer<>(DockerImageName.parse("mysql:8.0"))
+                .withDatabaseName("fitness_db")
+                .withUsername("root")
+                .withPassword("root")
+                .withInitScript("sql/schema.sql")
+                .withReuse(true);
 
-    @BeforeAll
-    static void startContainers() {
+        redis = new RedisContainer(DockerImageName.parse("redis:7-alpine"))
+                .withReuse(true);
+
+        kafka = new KafkaContainer(DockerImageName.parse("apache/kafka:3.8.0"))
+                .withReuse(true);
+
+        // 启动容器
         mysql.start();
         redis.start();
         kafka.start();
-
-        System.setProperty("spring.data.redis.host", redis.getHost());
-        System.setProperty("spring.data.redis.port", String.valueOf(redis.getFirstMappedPort()));
     }
 
     @DynamicPropertySource

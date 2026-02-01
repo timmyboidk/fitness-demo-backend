@@ -15,6 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.testcontainers.DockerClientFactory;
+
 /**
  * 冒烟测试 - 验证核心 API 端点在测试环境下的可用性
  * 
@@ -29,7 +32,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DisplayName("API 冒烟测试")
+@EnabledIf("isDockerAvailable")
 class SmokeTest {
+
+    /**
+     * 检查 Docker 是否可用
+     */
+    static boolean isDockerAvailable() {
+        try {
+            DockerClientFactory.instance().client();
+            return true;
+        } catch (Throwable ex) {
+            return false;
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
