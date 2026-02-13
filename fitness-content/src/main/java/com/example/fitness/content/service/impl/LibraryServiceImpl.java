@@ -56,6 +56,15 @@ public class LibraryServiceImpl implements LibraryService {
         return response;
     }
 
+    /**
+     * 将 Session 实体转换为 SessionDTO
+     *
+     * <p>
+     * 列表接口中 {@code moves} 字段返回空列表，需通过详情接口单独填充。
+     *
+     * @param session 数据库 Session 实体
+     * @return 前端可用的 SessionDTO
+     */
     private com.example.fitness.api.dto.SessionDTO convertToSessionDTO(
             com.example.fitness.content.model.entity.Session session) {
         return com.example.fitness.api.dto.SessionDTO.builder()
@@ -69,6 +78,16 @@ public class LibraryServiceImpl implements LibraryService {
                 .build();
     }
 
+    /**
+     * 将 Move 实体转换为 MoveDTO
+     *
+     * <p>
+     * 包含 {@code scoringConfigJson} 的 JSON 反序列化处理，
+     * 解析失败时降级返回空 Map，不阻断主流程。
+     *
+     * @param move 数据库 Move 实体
+     * @return 前端可用的 MoveDTO
+     */
     private MoveDTO convertToDTO(Move move) {
         MoveDTO dto = new MoveDTO();
         dto.setId(move.getId());

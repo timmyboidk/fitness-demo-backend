@@ -19,6 +19,16 @@ public class DataCollectionConsumer {
     private final UserStatsMapper userStatsMapper;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 消费 Kafka 事件消息
+     *
+     * <p>
+     * 从 {@code frontend_event_stream} Topic 消费消息，兼容
+     * {@code ConsumerRecord}、{@code String} 和普通对象三种格式。
+     * 通过判断 JSON 是否包含 {@code "score"} 字段来识别评分事件。
+     *
+     * @param message Kafka 消费到的原始消息对象
+     */
     @KafkaListener(topics = "frontend_event_stream", groupId = "fitness-data-group")
     public void consume(Object message) {
         log.info("从 Kafka 消费到事件: {}", message);
@@ -51,6 +61,15 @@ public class DataCollectionConsumer {
         }
     }
 
+    /**
+     * 处理评分结果事件
+     *
+     * <p>
+     * 将评分数据持久化到 MySQL（累加用户 {@code total_score}），
+     * 并模拟同步到 Doris 数据仓库。
+     *
+     * @param event 反序列化后的评分结果事件
+     */
     private void handleScoringEvent(ScoringResultEvent event) {
         // 2. MySQL 持久化 (核心指标)
         try {

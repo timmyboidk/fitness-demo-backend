@@ -8,24 +8,46 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类 - 对应数据库 user 表
+ * 用户实体类
+ *
+ * <p>
+ * 对应数据库 {@code user} 表，是系统核心实体。
+ * 手机号字段通过 {@code EncryptTypeHandler} 进行 AES 加密存储。
  */
 @Data
 @TableName(value = "`user`")
 public class User {
+
+    /** 用户唯一标识，自增主键 */
     @TableId(type = IdType.AUTO)
-    private Long id; // 用户 ID
+    private Long id;
 
+    /** 手机号（AES 加密存储，通过 {@code EncryptTypeHandler} 自动加解密） */
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = com.example.fitness.common.handler.EncryptTypeHandler.class)
-    private String phone; // 手机号 (加密存储)
+    private String phone;
 
-    private String nickname; // 昵称
-    private String password; // 密码
-    private String openId; // 微信 OpenID
-    private String sessionKey; // 微信会话密钥
-    private String difficultyLevel; // 运动难度等级
+    /** 用户昵称 */
+    private String nickname;
+
+    /** 密码（当前未使用，保留字段） */
+    private String password;
+
+    /** 微信 OpenID（唯一索引，用于微信登录关联） */
+    private String openId;
+
+    /** 微信小程序会话密钥（用于解密微信传输的敏感数据） */
+    private String sessionKey;
+
+    /** 运动难度等级（{@code novice} / {@code skilled} / {@code expert}） */
+    private String difficultyLevel;
+
+    /** 用户头像 URL */
     private String avatar;
+
+    /** 累计训练得分（由 Kafka 消费者异步更新） */
     private Integer totalScore;
+
+    /** 累计训练时长（秒，由 Kafka 消费者异步更新） */
     private Integer totalDuration;
 
     /** 创建时间 */
